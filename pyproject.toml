@@ -1,0 +1,41 @@
+[project]
+name = "rag"
+version = "0.1.0"
+description = "retrieval augmented generation"
+authors = ["Margarida Antunes <mbotelho@student.42lisboa.com>"]
+readme = "README.md"
+requires-python = ">=3.10"
+dependencies = [
+    "uv>=0.11.21",
+    "pydantic>=2.13.4",
+    "numpy>=2.2.6",
+    "flake8>=7.3.0",
+    "flake8-pyproject",
+    "mypy>=2.1.0",
+    "vllm-0.10.1"
+]
+
+[tool.uv.sources]
+llm-sdk = {path = "llm_sdk"}
+
+[tool.flake8]
+extend-exclude = [
+    ".venv",
+    "vllm-0.10.1",
+    "others_to_delete",
+    ".vscode",
+    ".mypy_cache",
+    "__pycahe__"
+]
+
+[tool.mypy]
+exclude = [
+    ".venv",
+    "vllm-0.10.1",
+    ".venv",
+    "llm_sdk",
+    "others_to_delete",
+    ".vscode",
+    ".mypy_cache",
+    "__pycahe__"
+]
