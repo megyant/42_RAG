@@ -16,7 +16,7 @@ from models import (MinimalSource, UnansweredQuestion,
 
 
 class Cli:
-    def index(self, max_chunk_ize: int = 2000):
+    def index(self, max_chunk_size: int = 2000):
         pass
 
     def search(self, query: str, k: int = 10):
@@ -29,8 +29,8 @@ class Cli:
     def answer(self, query: str, k: int = 10):
         pass
 
-    def answer_dataset(student_search_results_path: str, dataset_path: str):
+    def answer_dataset(self, student_search_results_path: str, save_directory: str):
         pass
 
-    def evaluate(student_search_results_path: str, dataset_path: str):
+    def evaluate(self, student_search_results_path: str, dataset_path: str):
         pass
