@@ -1,13 +1,18 @@
 import fire
-from .helpers import Colors
+from .helpers import Colors, CliError
 from .cli import Cli
+
 
 def main() -> None:
     try:
-        fire.Fire(Cli)
+        try:
+            fire.Fire(Cli)
+        except CliError:
+            print("TEMP")
 
     except KeyboardInterrupt:
         print(f"\n{Colors.RED}Exiting the program...{Colors.END}")
+
 
 if __name__ == "__main__":
     main()

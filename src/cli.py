@@ -8,28 +8,29 @@ evaluate –student_search_results_path <path> –dataset_path <path>
 """
 
 
-from models import (MinimalSource, UnansweredQuestion,
+""" from models import (MinimalSource, UnansweredQuestion,
                     AnsweredQuestion, RagDataset,
                     MinimalSearchResults, MinimalAnswer,
                     StudentSearchResults,
-                    StudentSearchResultsAndAnswer)
+                    StudentSearchResultsAndAnswer) """
 
 
 class Cli:
     def index(self, max_chunk_size: int = 2000):
         pass
 
-    def search(self, query: str, k: int = 10):
+    def search(self, query: str, k: int):
         pass
 
-    def search_dataset(self, dataset_path: str, k: int = 10,
-                       save_directory: str = "data/output/search_results/"):
+    def search_dataset(self, dataset_path: str, k: int,
+                       save_directory: str):
         pass
 
-    def answer(self, query: str, k: int = 10):
+    def answer(self, query: str, k: int):
         pass
 
-    def answer_dataset(self, student_search_results_path: str, save_directory: str):
+    def answer_dataset(self, student_search_results_path: str,
+                       save_directory: str):
         pass
 
     def evaluate(self, student_search_results_path: str, dataset_path: str):
