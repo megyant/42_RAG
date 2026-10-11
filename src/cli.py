@@ -16,22 +16,23 @@ evaluate –student_search_results_path <path> –dataset_path <path>
 
 
 class Cli:
-    def index(self, max_chunk_size: int = 2000):
+    def index(self, max_chunk_size: int = 2000) -> None:
         pass
 
-    def search(self, query: str, k: int):
+    def search(self, query: str, k: int) -> None:
         pass
 
     def search_dataset(self, dataset_path: str, k: int,
-                       save_directory: str):
+                       save_directory: str) -> None:
         pass
 
-    def answer(self, query: str, k: int):
+    def answer(self, query: str, k: int) -> None:
         pass
 
     def answer_dataset(self, student_search_results_path: str,
-                       save_directory: str):
+                       save_directory: str) -> None:
         pass
 
-    def evaluate(self, student_search_results_path: str, dataset_path: str):
+    def evaluate(self, student_search_results_path: str,
+                 dataset_path: str) -> None:
         pass
