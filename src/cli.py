@@ -14,6 +14,8 @@ evaluate –student_search_results_path <path> –dataset_path <path>
                     StudentSearchResults,
                     StudentSearchResultsAndAnswer) """
 
+""" Each should create a manager with the customized values """
+
 
 class Cli:
     def index(self, max_chunk_size: int = 2000) -> None:

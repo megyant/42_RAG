@@ -1,12 +1,14 @@
 import fire
 from .helpers import Colors, CliError
 from .cli import Cli
+from .ingesting import Ingest
 
 
 def main() -> None:
     try:
         try:
             fire.Fire(Cli)
+
         except CliError:
             print("TEMP")
 

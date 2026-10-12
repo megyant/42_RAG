@@ -1,9 +1,11 @@
-""" General chunking class """
+from abc import ABC
+from pydantic import BaseModel
 
 
-class Chunk:
+class ChunkData(BaseModel):
     ...
 
-    """
-    Grab the text from the parser, send it to the correct place
-    """
+
+class Chunk (ABC):
+    def chunk(path, text) -> list[ChunkData]:
+        ...
