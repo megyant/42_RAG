@@ -23,16 +23,29 @@ These belong to the CLI surface, but the chunker cannot be designed without them
 2. **What text do you store per chunk?** Just the chunk body, or chunk body + `file_path` + enclosing symbol name? *Why it matters:* subject VI.1 says it explicitly — *"What you keep at indexing time decides which of the two you can still match."*
 3. **What is your `k`?** Not the default — your tuned value. The walkthrough uses `k=10`; the pass metric is recall@5.
 
-### Note on dataset paths (reconcile later, low priority)
+### Note on dataset paths — RESOLVED, nothing to do
 
-The datasets were unzipped from `datasets_public.zip`, which explains where they are — but the extra nesting does not go away by being unzipped.
+**This was wrong in an earlier revision of these notes.** The extra `datasets_public/public/` nesting no longer exists. Verified on disk:
 
-| | |
-|---|---|
-| Subject VI.7.1 wants | `data/datasets/AnsweredQuestions/` |
-| Actually present | `data/datasets/datasets_public/public/AnsweredQuestions/` |
+```
+data/datasets/AnsweredQuestions/dataset_code_public.json
+data/datasets/AnsweredQuestions/dataset_docs_public.json
+data/datasets/UnansweredQuestions/dataset_code_public.json
+data/datasets/UnansweredQuestions/dataset_docs_public.json
+```
 
-Three extra path segments. Since paths are CLI arguments the pipeline still runs, but VI.7.1 says a structure mismatch means *"the corresponding checks are considered failed by design."* Moving the directories or symlinking is a two-minute job. Do it before the defense, not now.
+That is exactly what subject VI.7.1 asks for. Do not move anything.
+
+### Ground-truth paths are `data/raw/...` prefixed
+
+Worth stating once because it is a silent, total failure mode if you get it wrong:
+
+```
+data/raw/vllm-0.10.1/vllm/model_executor/layers/fused_moe/fused_batched_moe.py
+data/raw/vllm-0.10.1/docs/features/lora.md
+```
+
+Your indexer walks `data/raw/`, so if you store paths as returned by `rglob` and stringify them, you get this format for free. If you ever store `str(path.relative_to(...))` or a bare basename, you score **0.0 on every question** with no error message. See `RECALL_NOTES.md` §8.
 
 ---
 
@@ -103,39 +116,77 @@ These need **opposite** fixes. Find out which one you have before optimising any
 
 ---
 
-## 3. Highest-value investigation: profile the ground truth
+## 3. Ground-truth profiling — DONE, results below
 
-Do this **before** writing the splitter. It is the single most useful hour you will spend, and it makes every other decision cheaper.
+Earlier revisions of these notes kept recommending this as future work. It is done. Here is what it found, and one of the findings changes the design.
 
-### Question to answer
+### Q1: Are ground-truth ranges aligned to natural boundaries?
 
-**Are the ground-truth character ranges aligned to a natural boundary, or arbitrary?**
+**Mostly no.** Measured across every question in both datasets:
 
-### How to find out
+| | starts at a line boundary | starts mid-line |
+|---|---|---|
+| code | 20 / 99 (20%) | **79 / 99 (80%)** |
+| docs | 71 / 100 (71%) | 29 / 100 (29%) |
 
-Write a small script that:
-1. loads the first ~30 records from `data/datasets/datasets_public/public/AnsweredQuestions/dataset_code_public.json`
-2. for each, reads the file at `file_path`
-3. slices `content[first_character_index:last_character_index]`
-4. prints the text plus surrounding context
-
-Then look at the shapes:
-- Does `first_character_index` land on the start of a line?
-- Does the slice start with `def `, `class `, an assignment, a docstring? Or does it start mid-expression?
-
-Watch for suspiciously small ranges. Example from the real dataset:
+Actual code spans, first 8 records verbatim:
 
 ```
-vllm/entrypoints/llm.py  ->  64076 to 64088  =  12 CHARACTERS
+'@property\n    def activation_formats(\n        self\n    ) -> tuple[mk...   (559)
+'FP8_MIN: tl.constexpr = float8_info.min,\n    FP8_MAX: ...'                (93)
+'else:\n            raise ValueError(f"Unsupported sampling type...')       (1012)
+'"""\n        '                                                             (12)
+'cudagraph_capture_sizes = self.vllm_config.compilation_config\\...         (897)
+'if prefill_meta is None and decode_meta.use_cuda_graph:\n     ...'          (998)
+'def __init__(self, *, vllm_config: VllmConfig, prefix: str = ""):\n ...'    (963)
 ```
 
-That is one identifier, not a function body. Something chose that span.
+**The consequence is direct: a splitter that only emits `def` / `class` / heading-start chunks cannot match most code questions.** It would emit clean boundaries that sit tens of characters away from where the ground truth begins. That is the "right file, wrong region" failure bucket, produced by the chunker itself.
 
-Repeat for the docs dataset (`dataset_docs_public.json`). Then compare: do code and docs have visibly **different** segmentation styles? If yes, that directly informs your two required chunkers.
+This also retires the assumption in `RECALL_NOTES.md` §2.5 that *"structural boundaries are what produce nesting."* Nesting helps — but **only if your boundaries land near the reference ones**, and here they demonstrably do not.
 
-### Why this isn't cheating
+### Q2: Span-length distribution
 
-The spec tells you the metric and the overlap bar. Working out what the reference implementation did is legitimate reverse-engineering of the evaluation. It is the kind of thing that separates 55% from 85%. Use the information; document the method honestly in the README.
+```
+code  n=99   min=12  median=878    max=1578
+docs  n=100  min=40  median=1154.5 max=1997
+
+code: <100: 2 | 100-400: 6 | 400-800: 28 | 800-1200: 61 | 1200-1600: 2
+docs: <100: 4 | 100-400: 11 | 400-800: 16 | 800-1200: 22 | 1200-1600: 17 | 1600-2000: 30
+```
+
+Spans are **large and clustered high**. Nearly two thirds of code questions have spans over 800 chars; 30% of docs questions are over 1600. Combined with the mid-line finding, this says the reference spans are **broad windows over a region of interest**, not tight semantic units.
+
+### Q3: How many distinct files?
+
+```
+code  99 questions  ->  91 distinct .py files
+docs 100 questions  ->  56 distinct files (55 .md + 1 .txt)
+```
+
+Concentration to note: `supported_models.md` alone is the target for **7** docs questions; `openai_compatible_server.md` for 6. Files are almost all distinct targets (only 3 code files appear twice), so this is a **broad-shallow** retrieval problem, not a hub problem.
+
+Note the single `.txt` file in docs ground truth — `ingest.py` already includes `.txt` in its suffix list. Keep it.
+
+### Q4: What chunk size does the IoU rule actually permit?
+
+This is the decisive measurement, and it revises the advice in earlier revisions of these notes. I computed, for each candidate chunk size, **the fraction of questions where *some* chunk of that size placed anywhere in the file would satisfy IoU > 0.05** — i.e. the ceiling on recall achievable regardless of how good your ranking is:
+
+| chunk size | code ceiling | docs ceiling |
+|---|---|---|
+| 150 | 100% | 100% |
+| 200 | 100% | 100% |
+| 300 | 99% | 100% |
+| 400 | 99% | 100% |
+| 600 | 99% | 100% |
+| 800 | 99% | 99% |
+| 1000 | 99% | 99% |
+| 1500 | 99% | 97% |
+| 2000 | 98% | 96% |
+
+**Read this table carefully — it is the whole chunk-size decision.** Anything from 150 to 600 characters is essentially free. The IoU rule does **not** pick your chunk size for you; it only rules out the extremes. Past ~800 chars you start losing the tight spans (the 12- and 40-char ones) to the `20·L` upper bound, and by 2000 you have thrown away 4% of docs questions.
+
+So: **choose chunk size on retrieval-quality grounds.** The IoU arithmetic only forbids a very large chunk, and even at 2000 the cost is ~4 points of ceiling — not fatal, but real.
 
 ---
 
@@ -254,35 +305,41 @@ Index the whole identifier **and** its subparts. But that has a cost. Decide it 
 
 ## 8. Confirmed bugs in current code
 
-### `models.py:37` — field name typo (silent, and it will cost everything)
+### `models.py:37` — field name typo — RETRACTED, this was never a bug
+
+**An earlier revision of these notes claimed `StudentSearchResults` had `search_reults` instead of `search_results`. That was wrong.** Verified on disk, both models are spelled correctly:
 
 ```python
 class StudentSearchResults(BaseModel):
-    search_reults: List[MinimalSearchResults]   # TYPO: "reults"
+    search_results: List[MinimalSearchResults]
+    k: int
+
+class StudentSearchResultsAndAnswer(BaseModel):
+    search_results: List[MinimalAnswer]
     k: int
 ```
 
-Subject VI.4 specifies `search_results`. You have `search_reults`. Pydantic will **not** warn you — it serialises exactly what you wrote, and the moulinette will not find the field.
-
-Note line 42 (`StudentSearchResultsAndAnswer`) spells it **correctly**, so this is a copy-paste slip.
-
-**Guard against recurrences:** construct the model, `model_dump()`, assert the keys match the subject's JSON exactly.
+`models.py` matches subject VI.4 verbatim. **Do not "fix" anything here.** The general lesson still stands — after building a result writer, construct the model, `model_dump()`, and assert the keys match the subject's JSON exactly. That check is cheap and catches this whole class of error.
 
 ### Retracted — two things flagged earlier that were wrong
 
 - **`MinimalAnswer(MinimalSearchResults)` is CORRECT.** Subject VI.4 mandates that inheritance verbatim. Do not "fix" it.
 - **The `evaluate` question is ANSWERED.** Subject VI.6 says `evaluate` is for your own iteration, the official metric comes from the moulinette, and *"Your solution must never import or call the moulinette."* So `evaluate` **is** a genuine reimplementation of recall@k on your side.
 
-### `pyproject.toml:18-19` — broken source path (could fail the whole defense)
+### `pyproject.toml:18-19` — dead `[tool.uv.sources]` entry (harmless today, remove it)
 
 ```toml
 [tool.uv.sources]
 llm-sdk = {path = "llm_sdk"}
 ```
 
-But `llm_sdk` lives at `/mnt/HDD/42lisboa/call_me_maybe/llm_sdk` — **outside** the `RAG/` project. This path does not resolve. And `llm-sdk` is not listed in `[project.dependencies]` either.
+`llm_sdk` does not exist in this repo (it lives in the `call_me_maybe` project) and `llm-sdk` is **not** in `[project.dependencies]`. So uv has nothing to resolve for it.
 
-Subject V.4: *"the reviewer and the moulinette only run `uv sync`."* So a broken resolution here is a **hard failure** at the defense. **Verify `uv sync` succeeds from a clean state.**
+**An earlier revision of these notes claimed this would break `uv sync` and therefore fail the defense. That was overstated.** Verified by copying `pyproject.toml`, `uv.lock`, `README.md` and `src/` into an empty directory and running `uv sync --frozen`: it completes with exit 0. uv ignores source entries whose package is not a dependency.
+
+Still worth deleting, for one practical reason: the moment you *do* add `llm-sdk` as a real dependency, that path resolves against a directory that is not in the repo and breaks the build. Remove the block now; re-add a vendored `llm_sdk/` under this repo if you later want to reuse it from `call_me_maybe`.
+
+Subject V.4 still holds — *"the reviewer and the moulinette only run `uv sync`"* — so keep re-verifying from a clean checkout before the defense. It works today.
 
 ### `Makefile:52` — `lint-strict` does not do what the subject requires
 
@@ -352,16 +409,26 @@ Yours is currently a bare link list. Subject Chapter VIII requires:
 | Path | Status |
 |---|---|
 | `src/` | OK |
-| `pyproject.toml` + `uv.lock` at root | OK (but see the `uv sync` bug) |
+| `pyproject.toml` + `uv.lock` at root | OK — `uv sync --frozen` verified from a clean dir |
 | `README.md` at root | present, **not compliant** |
 | `data/raw/` | OK |
 | `data/processed/` | **MISSING** — index output goes here |
-| `data/datasets/UnansweredQuestions/` | **MISSING** — wrong nesting (§0) |
-| `data/datasets/AnsweredQuestions/` | **MISSING** — wrong nesting (§0) |
+| `data/datasets/UnansweredQuestions/` | **OK** — verified present |
+| `data/datasets/AnsweredQuestions/` | **OK** — verified present |
 | `data/output/search_results/<Scope>/` | **MISSING** — `search_dataset` output |
 | `data/output/search_results_and_answer/<Scope>/` | **MISSING** — `answer_dataset` output |
 
 All input/output paths must be CLI args and **never hard-coded**: *"If the structure or the command interface is not respected, the reference scripts cannot run and the corresponding checks are considered failed by design."*
+
+### `src/chunking/__init__.py` — imports a module that does not exist
+
+```python
+from .parser import Parser   # src/chunking/parser.py does not exist
+```
+
+Verified: `import src.chunking` raises `ModuleNotFoundError: No module named 'src.chunking.parser'`. Nothing imports `src.chunking` yet, so this is dormant rather than fatal — but it will surface the moment `cli.py` or `manager.py` touches chunking, and it will look like a confusing error at that point. Delete the line or write the module.
+
+Note the related stubs: `ChunkData(BaseModel)` is `...`, and `Chunk.chunk` is an abstractmethod with no annotations. `flake8` and `mypy` both currently fail on these files.
 
 ### Answer generation (VI.3)
 
@@ -375,7 +442,7 @@ Yours matches the subject's required flags. Good.
 
 ## 10. What to read, in priority order
 
-1. **Profile the ground-truth ranges (§3).** Do this first — it determines your target and makes everything else cheaper. Cheap to do, highly informative.
+1. ~~**Profile the ground-truth ranges (§3).**~~ **DONE.** Findings: spans are large (median 878/1154) and **80% of code spans start mid-line**. Design your chunkers against that.
 2. **`ast` docs** — `lineno`, `col_offset`, `end_lineno`, `end_col_offset`. Settle the line-vs-character question and the multi-line-string problem. Plus the Twig code-splitting article (both already in your README).
 3. **BM25** — the Robertson/Sparck Jones IDF formulation, *not* a library docstring. Your chunks have wildly varying lengths; the length-normalization term does the heavy lifting when one chunk is 40 chars and its neighbour is 1900.
 4. **Sweep the chunk size empirically.** Index at several sizes, measure recall@5 on **both** datasets. This is a **deliverable**, not just debugging: subject VI.1 explicitly says *"Smaller chunks are fine; report the effect on your recall@k."* That sweep also fills your README's Performance analysis section.
@@ -385,16 +452,33 @@ Yours matches the subject's required flags. Good.
 
 ## 11. Questions still open
 
-**Q1.** How many files and how many total characters are in `data/raw/vllm-0.10.1`? That is your 5-minute indexing budget **and** your 90-second retrieval budget. Both currently unknown. Countable in a minute. Start here if you want one cheap, immediately useful thing to do.
+**Q1.** ~~How many files and how many total characters?~~ **DONE.** 1937 `.py`/`.md` files, 20,003,424 chars. At 400 chars/chunk that is ~50k chunks. 5-minute indexing budget and 450ms/query retrieval budget both follow from this.
 
-**Q2.** Do the ground-truth ranges look like they were produced by a specific segmentation strategy? (§3 — the big one.)
+**Q2.** ~~Do the ground-truth ranges reveal a specific segmentation strategy?~~ **DONE, partially.** They are *not* aligned to structural boundaries (80% of code spans start mid-line) and they are *not* tight — median 878/1154 chars. They behave like broad windows placed around a region of interest. Whether they were produced by a reference chunker, by a human, or by an LLM is still unknown, and it does not change what you should build.
 
-**Q3.** For a Python chunker, how do you get **character** offsets from `ast`, and what happens to them when a decorator or a multi-line string spans lines? (§4.)
+**Q3.** For a Python chunker, how do you get **character** offsets from `ast`, and what happens to them when a decorator or a multi-line string spans lines? (§4.) **Still open — this is yours to answer.**
+
+**Q4.** If the reference spans are *not* structural, what boundary rule do you use instead? Overlapping windows? Line-aligned windows? A structural splitter plus a fallback merge for oversized nodes? The 80%-mid-line finding is the argument against a pure structural splitter, but it is not itself a prescription. **This is the main open design question, and it is the one subject X.1 will likely probe.**
 
 ---
 
 ## 12. What was deliberately not done
 
-No chunker, indexer, tokenizer, or retrieval code was written. No project files were modified.
+No chunker, indexer, tokenizer, or retrieval code was written. No project files were modified apart from these notes.
 
 These notes describe problems and the questions that expose them. **The design is yours.** If you write it, you will have to defend it — and that is the point: subject X.1 says a few minutes of live modification may be requested to verify you understand the project.
+
+---
+
+## 13. Revision log
+
+Kept so you can see which earlier advice was wrong, and not act on it.
+
+| Claim | Status |
+|---|---|
+| Datasets nested under `datasets_public/public/` | **FALSE** — already at the VI.7.1 paths |
+| `models.py:37` has a `search_reults` typo | **FALSE** — model is correct |
+| `pyproject.toml` `[tool.uv.sources]` breaks `uv sync` and fails the defense | **OVERSTATED** — `uv sync --frozen` verified clean, exit 0. Still delete the dead entry |
+| Ground-truth profiling is future work | **STALE** — done, §3 |
+| "Structural boundaries are what produce nesting" (from `RECALL_NOTES` §2.5) | **MISLEADING** — 80% of code spans start mid-line, so clean structural boundaries will often miss |
+| Recommend 400-char chunks as the unadorned baseline (`RECALL_NOTES` §5.3) | **STILL REASONABLE** — §3's ceiling table puts 400 at 99%/100%, so it costs nothing on IoU grounds. Whether it retrieves *well* is untested |

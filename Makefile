@@ -8,6 +8,8 @@ MYPY_FLAGS = --warn-return-any --warn-unused-ignores \
              --ignore-missing-imports --disallow-untyped-defs \
              --check-untyped-defs
 
+ARGS = index --max_chunk_size 0
+
 install:
 	@if ! command -v uv >/dev/null 2>&1; then \
 		echo "Installing uv..."; \
@@ -28,15 +30,15 @@ install:
 
 run: install
 	@if [ -d /sgoinfre ]; then \
-		HF_HOME=$(SGOINFRE_HF) UV_CACHE_DIR=$(SGOINFRE_CACHE) uv run python -m src; \
+		HF_HOME=$(SGOINFRE_HF) UV_CACHE_DIR=$(SGOINFRE_CACHE) uv run python -m src $(ARGS); \
 	else \
-		uv run python -m src; \
-	fi
+		uv run python -m src $(ARGS); \
+	fi || true
 	
 
 debug: install
 	@if [ -d /sgoinfre ]; then \
-		HF_HOME=$(SGOINFRE_HF) UV_CACHE_DIR=$(SGOINFRE_CACHE) uv run python -m pdb .; \
+		HF_HOME=$(SGOINFRE_HF) UV_CACHE_DIR=$(SGOINFRE_CACHE) uv run python -m pdb -m src; \
 	else \
 		uv run python -m pdb -m src; \
 	fi

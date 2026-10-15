@@ -1,11 +1,7 @@
-from abc import ABC
-from pydantic import BaseModel
-
-
-class ChunkData(BaseModel):
-    ...
+from abc import ABC, abstractmethod
 
 
 class Chunk (ABC):
+    @abstractmethod
     def chunk(path, text) -> list[ChunkData]:
         ...

@@ -1,17 +1,16 @@
 import fire
+import sys
 from .helpers import Colors, CliError
 from .cli import Cli
-from .ingesting import Ingest
 
 
 def main() -> None:
     try:
-        try:
-            fire.Fire(Cli)
+        fire.Fire(Cli)
 
-        except CliError:
-            print("TEMP")
-
+    except CliError as e:
+        print(e, file=sys.stderr)
+        sys.exit(1)
     except KeyboardInterrupt:
         print(f"\n{Colors.RED}Exiting the program...{Colors.END}")
 

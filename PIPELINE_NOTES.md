@@ -93,6 +93,21 @@ The tokens `trust_remote_code` may never appear in the question at all. And BM25
 
 Look at the actual ground truth and classify: how many questions quote identifiers verbatim, and how many purely paraphrase? That ratio tells you how much this gap will cost you.
 
+**Measured — questions containing a snake_case identifier:**
+
+| | with identifier | without |
+|---|---|---|
+| code | **70 / 99** | 29 |
+| docs | **9 / 100** | 91 |
+
+**This inverts the assumption in §1.5 and §1.6.** The paraphrase gap is not mainly a code problem — it is a **docs** problem. 91% of docs questions are pure prose, while 71% of code questions quote an identifier verbatim.
+
+That matters because your thresholds are 80% docs and 50% code. The harder dataset is already the harder one. Concretely:
+
+- **On code**, identifier-preserving tokenization (§6 of `CHUNKING_NOTES.md`) is likely to be decisive. Keep `trust_remote_code` whole as well as split.
+- **On docs**, the paraphrase gap is the whole game, and pure BM25 has little to grip. This is the strongest argument in the whole project for the hybrid/embedding bonus (§4) — but only after the mandatory part validates.
+- Stopword handling should be measured **separately per dataset**, not globally: removing English stopwords probably helps docs and does nothing useful for code.
+
 ### 1.5 Mitigations, cheapest first
 
 **A. Index document-level context alongside the chunk body.** This is the highest-value cheap trick, and it is really a *chunking* decision (see `CHUNKING_NOTES.md` §0, decision 2). Prepend `file_path` and the enclosing symbol name to each chunk's indexed text.
@@ -365,35 +380,36 @@ Named cases to handle: empty query, nonsensical query, `k=0`, missing files, mal
 
 ---
 
-## 6. Corpus measurement
+## 6. Corpus measurement — DONE
 
-The open question from `CHUNKING_NOTES.md` §11 (Q1) was: how many files and characters are in `data/raw/vllm-0.10.1`? That is both your 5-minute indexing budget and your 90-second retrieval budget. It is countable in under a minute:
+The open question from `CHUNKING_NOTES.md` §11 (Q1) is answered:
 
-```bash
-# total files
-find data/raw/vllm-0.10.1 -type f | wc -l
-
-# broken down by extension — tells you the chunker mix
-find data/raw/vllm-0.10.1 -type f | sed 's/.*\.//' | sort | uniq -c | sort -rn | head -20
-
-# total characters in .py and .md only
-find data/raw/vllm-0.10.1 -type f \( -name '*.py' -o -name '*.md' \) -exec cat {} + | wc -c
+```
+all files                                2867
+.py + .md files                          1937
+total chars in .py + .md        20,003,424
 ```
 
-**Run this before choosing a chunk size.** It tells you:
-- how many chunks you will produce (`total_chars / avg_chunk_size`)
-- whether the naive full-scan approach in §1.1 is even conceivable
-- whether you must restrict ingestion by extension, and which ones
+Derived budget numbers:
 
-You will almost certainly want to index **only `.py` and `.md`**, matching the two ground-truth datasets. That is a defensible ingestion policy — document it.
+| Quantity | Value |
+|---|---|
+| Chunks at 400 chars | **~50,000** |
+| Naive full-scan cost per query | 50,000 tokenisations |
+| × 200 questions | 10,000,000 tokenisations |
+| Your actual budget | 90 s total, 450 ms/query |
+
+So §1.1's conclusion is not a preference, it is arithmetic: **you must precompute at index time.** A `term -> [(chunk_id, tf)]` inverted index touches only chunks containing query terms, typically a few hundred.
+
+**On ingestion policy:** indexing only `.py` and `.md` matches 99% of ground truth (91/91 code files are `.py`; 55/56 docs files are `.md`). But note there is **one `.txt` file in docs ground truth**, so keep `.txt` in your suffix list — `ingest.py` already has it. Verify the corpus-to-ground-truth extension match yourself before you decide; the one `.txt` shows the sets are not perfectly identical.
 
 ---
 
 ## 7. Open questions
 
 **Retrieval**
-1. How many chunks does your corpus produce, and is your IDF non-negative across all terms (§1.3)?
-2. What is the ratio of questions quoting identifiers verbatim to purely paraphrasing questions (§1.4)?
+1. How many chunks does your corpus produce, and is your IDF non-negative across all terms (§1.3)? **Partly answered:** ~50,000 chunks at 400 chars. The IDF check is still yours.
+2. ~~What is the ratio of questions quoting identifiers to paraphrasing?~~ **Answered:** 70/99 code, 9/100 docs. The gap is a **docs** problem. (§1.4)
 3. When you have a baseline: are your failures wrong-file or right-file-wrong-region (§1.7)?
 4. Does prepending `file_path` and the symbol name to the indexed text help or hurt (§1.5A)?
 
@@ -402,19 +418,27 @@ You will almost certainly want to index **only `.py` and `.md`**, matching the t
 6. How will you measure grounding without a trustworthy LLM judge (§2.3)?
 
 **Evaluation**
-7. Does your overlap rule match the moulinette's exactly — and have you verified against its source or by calibration (§3.2)?
-8. Does your recall average per-question or pool across all sources (§3.3)?
+7. ~~Does your overlap rule match the moulinette's exactly?~~ **Answered:** yes — formula and conventions recovered and cross-verified (§3.2, `RECALL_NOTES.md` §2). Your job is to port it faithfully.
+8. Does your recall average per-question or pool across all sources (§3.3)? **Per-question** — see `RECALL_NOTES.md` §2.3.
 
 **Bonus**
 9. Which of #3/#4 first, and does your indexing loop make hashing nearly free (§4)?
 
 **Still open from `CHUNKING_NOTES.md`:**
-10. Do the ground-truth ranges reveal a specific segmentation strategy?
+10. ~~Do the ground-truth ranges reveal a specific segmentation strategy?~~ **Answered, and the answer is no** — 80% of code spans start mid-line. The open question is now: *what boundary rule do you use instead?* (`CHUNKING_NOTES.md` §3 Q4)
 
 ---
 
 ## 8. What was deliberately not done
 
-No retrieval code, prompt, evaluation function, index format, or API was written. No project files were modified apart from creating this notes file.
+No retrieval code, prompt, evaluation function, index format, or API was written. No project files were modified apart from these notes files.
 
 These notes identify problems and the questions that expose them. The design is yours, and subject X.1 means you will be asked to defend it.
+
+### Revision log
+
+| Claim | Status |
+|---|---|
+| "Corpus measurement — run this first" (§6) | **DONE** — 1937 files, 20,003,424 chars, ~50k chunks |
+| "Look at the ground truth and classify identifier vs paraphrase" (§1.4) | **DONE** — 70/99 code, 9/100 docs. The gap is a *docs* problem |
+| `llm_sdk` path "will break `uv sync`" | **OVERSTATED** — `uv sync --frozen` verified clean. See `CHUNKING_NOTES.md` §8 |
