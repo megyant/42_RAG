@@ -272,3 +272,128 @@ both to pass; V.2 makes `lint` mandatory.
 - `lint-strict: flake8` refers to a target that doesn't exist; make errors.
   V.2 wants lint-strict to run **both** `flake8 .` and `mypy . --strict`.
 - `debug` runs `python -m pdb .` which points pdb at a directory.
+
+---
+
+# TO BE DONE
+
+## Stage 0 -- Foundations (do first, nothing else is testable without these)
+
+- [ ] `ChunkData` in `src/models.py`, extending `MinimalSource` with `text`
+- [ ] Line-start table: absolute char offset of every `\n` per file
+- [ ] Fix `src/chunking/__init__.py` -- it imports `from .parser import Parser`,
+      a module that does not exist, so `import src.chunking` raises
+      `ModuleNotFoundError`
+- [ ] Fill in `chunk()` signature with annotations: `chunk(self, path: Path,
+      text: str) -> list[ChunkData]`
+- [ ] mypy: return annotations on the Manager methods (8 errors currently)
+- [ ] flake8: missing newline in `chunk_code.py`
+- [ ] Print a confirmation + chunk count from `Manager.index` -- `Cli.index`
+      currently discards the return, so success is invisible
+
+## Stage 1 -- Chunking
+
+- [ ] **Decide the oversized-node fallback** (blocks everything below)
+- [ ] `ChunkCode` on ONE small vLLM file
+- [ ] Verify round-trip: `original[first:last] == chunk.text`
+- [ ] Verify cap: `last - first <= max_chunk_size`
+- [ ] Verify determinism: two runs -> byte-identical output
+- [ ] Decorator handling: `node.decorator_list[0].lineno`, not `node.lineno`
+- [ ] Run across the whole `.py` corpus, **time it** (5 min budget)
+- [ ] `ChunkMarkdown` -- headings, front matter, code fences
+- [ ] `ChunkText` -- fixed-size windows (3 docs questions target `CMakeLists.txt`)
+- [ ] Dispatch by suffix, in the chunking package rather than `Manager`
+
+## Stage 2 -- Persistence
+
+- [ ] Pick format: pickle / JSON / SQLite
+- [ ] Write to `data/processed/`
+- [ ] Assert on load that no span exceeds 2000
+- [ ] Round-trip check against the original files after reload
+
+## Stage 3 -- Retrieval
+
+- [ ] Tokenizer: shared between index and query (never two implementations)
+- [ ] Keep `skip_sampler_cpu_output` whole AND split -- 70/99 code questions
+      quote identifiers verbatim
+- [ ] Inverted index: `term -> [(chunk_id, tf)]`, precomputed at index time
+- [ ] BM25 with Lucene IDF variant (`+1`) -- Robertson/Sparck Jones goes
+      negative when `df > N/2`, which is common on a code corpus
+- [ ] `Manager` caches the loaded index -- once per process, not per question
+- [ ] Validate `k`, check `dataset_path` exists, create `save_directory`
+- [ ] Sort results by descending score -- the grader never sorts for you
+- [ ] Emit an entry for **every** question; omission is a silent zero
+- [ ] Write `StudentSearchResults` with exact `data/raw/...` paths
+
+## Stage 4 -- Evaluate (build early -- it's standalone and testable)
+
+- [ ] Port the recall rule faithfully: true IoU, `inter / (len1 + len2 - inter)`
+- [ ] Half-open spans, `length = last - first`, no `+1`
+- [ ] Strict `>` on IoU 0.05 -- exactly 0.05 must FAIL
+- [ ] Per-source 0/1 with `break`, denominator `len(true_sources)`
+- [ ] Empty ground-truth sources -> 1.0; empty predictions -> 0.0
+- [ ] Omitted questions score 0 and still count in the denominator
+- [ ] **Oracle test:** feed ground-truth `sources` back as `retrieved_sources`,
+      must score 1.0. If not, the format is wrong and every other number is
+      meaningless
+- [ ] Complement test: empty `retrieved_sources` -> 0.0
+
+## Stage 5 -- Answer generation
+
+- [ ] Qwen/Qwen3-0.6B, weights outside the repo (`HF_HOME` already points to
+      `/sgoinfre` on campus)
+- [ ] Do NOT make the model emit JSON -- generate plain text, attach it to
+      `MinimalAnswer` in Python
+- [ ] Read `max_position_embeddings` from the config; don't assume
+- [ ] Refusal clause in the system prompt; ask it to name the source file
+- [ ] Greedy / temperature 0 for determinism
+- [ ] Load the model ONCE, not per question
+- [ ] `answer_dataset` copies `retrieved_sources` from its input file
+- [ ] Output `StudentSearchResultsAndAnswer`
+
+## Stage 6 -- Robustness (VI.6 edge cases)
+
+- [ ] Empty query
+- [ ] Nonsensical query
+- [ ] `k=0`, `k` larger than the index
+- [ ] Missing files, malformed JSON
+- [ ] Unreadable / binary / CRLF files during ingestion
+- [ ] No unhandled traceback in any path; non-zero exit on failure
+- [ ] tqdm progress bars on `index` and `search_dataset` (V.4 requires them,
+      and `tqdm` is not yet in `pyproject.toml` dependencies)
+
+## Stage 7 -- Submission
+
+- [ ] README: italic first line, Description, Instructions, Resources
+- [ ] README: System architecture, Chunking strategy, Retrieval method,
+      Performance analysis, Design decisions, Challenges faced, Example usage
+- [ ] **Chunk-size sweep** -- VI.1 requires reporting the effect on recall@k.
+      This is what fills Performance analysis
+- [ ] README: how AI was used, for which tasks and which parts
+- [ ] `data/output/` directories created as the layout requires
+- [ ] `uv sync` verified from a clean checkout
+- [ ] Remove the dead `[tool.uv.sources] llm-sdk` entry
+- [ ] `make lint-strict` actually runs both tools
+- [ ] `make debug` points at a runnable script
+
+## Stage 8 -- Bonus (only after the mandatory part fully validates)
+
+- [ ] 1. Semantic embeddings (`all-MiniLM-L6-v2`) alongside the lexical index
+- [ ] 2. Hybrid retrieval -- **RRF** (`1/(c + rank)`), not weighted score sums;
+      BM25 is unbounded while cosine is [-1, 1]
+- [ ] 3. Incremental indexing -- content hash vs mtime+size; hashing is
+      nearly free if the indexing loop already reads every file
+- [ ] 4. Caching -- index and query results; shares the cache-key design with 3
+- [ ] 5. Local HTTP API -- read-only query and answer endpoints, not index build
+
+---
+
+## Open decisions (need your answer before the dependent stage)
+
+| Decision | Blocks | Options |
+|---|---|---|
+| Oversized-node fallback | Stage 1 | recurse into nested defs / fixed-size windows / merge siblings |
+| Index format | Stage 2 | pickle / JSON / SQLite |
+| Middleware for BM25 | Stage 3 | Lucene `+1` IDF (safer) vs Robertson (negative on code) |
+| `b` and `k1` | Stage 3 | sweep; chunks vary ~40x in length so `b` will move recall |
+| Retrieval `k` vs generation `k` | Stage 5 | same `k`, or wide retrieval + narrow context |
