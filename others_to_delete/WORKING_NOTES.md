@@ -245,21 +245,100 @@ higher threshold (80% vs 50%).
 
 ## Build order
 
-1. `ChunkData` in models.py
-2. line-start table (converts `ast.lineno` -> character offset)
-3. `ChunkCode` on **one small file** -- check round-trip, cap, determinism
-4. whole `.py` corpus + **time it** (5 min budget)
-5. `ChunkMarkdown`
-6. persist to `data/processed/`
-7. one query, **no scoring** -- does the right file come back?
+See "TO BE DONE" at the bottom of this file for the staged breakdown.
 
-Step 7 before BM25. Cheapest signal on whether chunking is sane.
+Short version: plumbing before algorithms, one file before the corpus, and
+one real query before any scoring.
 
-**Open decision:** the oversized-node fallback. A function > `max_chunk_size`
-must still be split or the whole submission is invalid. Options: recurse into
-nested defs, fixed-size windows, merge siblings.
+**DECIDED -- oversized-node split:** equal parts, line-aligned, `overlap_lines = 1`.
+See "Oversized nodes" below.
 
-## Open lint state
+## Oversized nodes -- DECIDED
+
+### Why it had to be decided
+
+`max_chunk_size` caps what you **emit**. It does not cap the size of `ast`
+nodes you **find**. A node of 13,388 characters cannot be emitted as one chunk.
+
+Measured on the real corpus:
+
+```
+sampled 60 .py files -> 444 nodes examined -> 72 over 2000 chars (16%)
+files affected: 28 / 60
+largest: create_argument_parser, 13388 chars, benchmarks/benchmark_serving.py
+```
+
+And among files the ground truth actually targets:
+
+```
+87 / 91 ground-truth code files contain >=1 oversized node
+  flashinfer.py: 11      datasets.py: 16      common.py: 13
+```
+
+**This is not an edge case. It is the primary path.**
+
+### The algorithm
+
+```
+split oversized node:
+  1. nparts = ceil(node_size / cap); target = ceil(node_size / nparts)
+  2. greedy fill on LINE boundaries up to `target`
+  3. HARD GUARANTEE: any part still > cap gets windowed on char boundaries
+  4. overlap: pull the previous part's last whole line forward --
+     ONLY if the result still fits under the cap
+```
+
+### Why steps 3 and 4 are mandatory, not defensive
+
+**Step 3:** step 2 can overshoot. A first attempt produced a 2,488-char part and
+only an assertion caught it. Without the windowing pass you emit an invalid span
+and the whole submission is rejected.
+
+**Step 4:** extending a part's start backward *grows its width*. Overlap is
+itself capable of pushing a part over the cap. A second attempt hit exactly
+this. So the overlap is conditional on the widened part still fitting.
+
+### Verified
+
+```
+223 oversized nodes split across 120 real files
+largest emitted chunk: 2000 (cap 2000)  OK
+no part exceeds cap, none escapes its node
+
+overlap_lines=0: 66/67 = 99%
+overlap_lines=1: 66/67 = 99%
+overlap_lines=2: 66/67 = 99%
+```
+
+### Why overlap_lines = 1
+
+0, 1 and 2 all give 99%, so overlap does not move recall *on average* --
+reference spans (median 878) sit comfortably inside 2000-char parts, so padding
+mostly just grows the union.
+
+But overlap removes a real failure mode. Without it, a span landing just past a
+cut boundary is lost entirely:
+
+```
+truth [63,110), part 1 ends at 60  ->  captures 0  ->  IoU = 0  FAIL
+truth [63,110), part 2 starts at 40 ->  captures 47 ->  IoU = 0.59  PASS
+```
+
+One line of overlap costs nothing and eliminates the boundary miss. Two is
+redundant.
+
+**Note:** "repeat the last sentence" does not translate to code -- there are no
+sentences. The unit is a **line**, and cutting mid-identifier
+(`add_argum` / `ent(...)`) is what to avoid.
+
+### Carry into your implementation
+
+Assert both, in code, not comments:
+
+```
+assert part_end - part_start <= max_chunk_size     # hard subject constraint
+assert original[first:last] == chunk.text          # round-trip
+```
 
 `flake8` clean. `mypy` reports missing return annotations on the Manager stub
 methods and an untyped `chunk()` in `chunking/chunk.py`. Subject V.1 requires
@@ -279,39 +358,65 @@ both to pass; V.2 makes `lint` mandatory.
 
 ## Stage 0 -- Foundations (do first, nothing else is testable without these)
 
-- [ ] `ChunkData` in `src/models.py`, extending `MinimalSource` with `text`
+- [x] `ChunkData` in `src/models.py`, extending `MinimalSource` with `text`
 - [ ] Line-start table: absolute char offset of every `\n` per file
-- [ ] Fix `src/chunking/__init__.py` -- it imports `from .parser import Parser`,
+- [x] Fix `src/chunking/__init__.py` -- it imports `from .parser import Parser`,
       a module that does not exist, so `import src.chunking` raises
       `ModuleNotFoundError`
-- [ ] Fill in `chunk()` signature with annotations: `chunk(self, path: Path,
+- [x] Fill in `chunk()` signature with annotations: `chunk(self, path: Path,
       text: str) -> list[ChunkData]`
 - [ ] mypy: return annotations on the Manager methods (8 errors currently)
-- [ ] flake8: missing newline in `chunk_code.py`
-- [ ] Print a confirmation + chunk count from `Manager.index` -- `Cli.index`
+- [x] flake8: missing newline in `chunk_code.py`
+- [x] Print a confirmation + chunk count from `Manager.index` -- `Cli.index`
       currently discards the return, so success is invisible
 
-## Stage 1 -- Chunking
+## Stage 1 -- Ingest -> Chunk handoff (plumbing, no algorithm yet)
 
-- [ ] **Decide the oversized-node fallback** (blocks everything below)
-- [ ] `ChunkCode` on ONE small vLLM file
-- [ ] Verify round-trip: `original[first:last] == chunk.text`
-- [ ] Verify cap: `last - first <= max_chunk_size`
-- [ ] Verify determinism: two runs -> byte-identical output
-- [ ] Decorator handling: `node.decorator_list[0].lineno`, not `node.lineno`
-- [ ] Run across the whole `.py` corpus, **time it** (5 min budget)
-- [ ] `ChunkMarkdown` -- headings, front matter, code fences
+Get one chunk coming out the other end before writing any `ast` logic. Getting
+the plumbing visible first is much easier to debug than finding it afterwards
+inside a splitter.
+
+- [ ] Fix `chunk()` signature in `chunking/chunk.py`: add `self`, add
+      annotations, accept `max_chunk_size` at construction not per call
+- [ ] `ChunkData` in `src/models.py`, extending `MinimalSource` with `text`
+- [ ] Suffix dispatch: `.py` -> `ChunkCode`, `.md` -> `ChunkMarkdown`,
+      `.txt` -> text strategy. Decide whether the rule lives in `Manager.index`
+      or as a factory in the chunking package
+- [ ] Rewrite `ingest()` -- it currently discards the text. Either return it, or
+      drop the separate method and let `Manager.index` walk and read in one pass
+- [ ] Handle `read_file` returning `str | None` -- skip unreadable files, never
+      pass `None` to a chunker
+- [ ] Keep walk and read in ONE loop. Do not call `collect_files()` per file
+- [ ] Build one chunker holding `max_chunk_size`, loop all files through it
+- [ ] `Manager.index` prints a confirmation + chunk count -- `Cli.index`
+      currently discards the return, so success is invisible
+- [ ] Confirm the plumbing with `ChunkCode`'s body still empty
+
+## Stage 2 -- Chunking algorithms
+
+- [ ] Line-start table per file (converts `ast.lineno` -> character offset)
+- [ ] `ChunkCode`: parse, top-level def/class, decorator-aware
+      (`node.decorator_list[0].lineno`, not `node.lineno`)
+- [ ] Oversized-node split: equal parts, line-aligned, `overlap_lines = 1`
+      (see "Oversized nodes" above)
+- [ ] Assert on every emitted part: `last - first <= max_chunk_size`
+- [ ] Assert round-trip: `original[first:last] == chunk.text`
+- [ ] Determinism: two runs -> byte-identical output. The defense re-runs the
+      pipeline
+- [ ] `ChunkMarkdown` -- headings, front matter, code fences. 71% of docs spans
+      start at a line boundary, so headings genuinely align there
 - [ ] `ChunkText` -- fixed-size windows (3 docs questions target `CMakeLists.txt`)
-- [ ] Dispatch by suffix, in the chunking package rather than `Manager`
+- [ ] Run across the whole corpus, **time it** (5 min budget)
 
-## Stage 2 -- Persistence
+## Stage 3 -- Persistence
 
 - [ ] Pick format: pickle / JSON / SQLite
 - [ ] Write to `data/processed/`
 - [ ] Assert on load that no span exceeds 2000
 - [ ] Round-trip check against the original files after reload
+- [ ] Determinism of the persisted artifact
 
-## Stage 3 -- Retrieval
+## Stage 4 -- Retrieval
 
 - [ ] Tokenizer: shared between index and query (never two implementations)
 - [ ] Keep `skip_sampler_cpu_output` whole AND split -- 70/99 code questions
@@ -325,7 +430,7 @@ both to pass; V.2 makes `lint` mandatory.
 - [ ] Emit an entry for **every** question; omission is a silent zero
 - [ ] Write `StudentSearchResults` with exact `data/raw/...` paths
 
-## Stage 4 -- Evaluate (build early -- it's standalone and testable)
+## Stage 5 -- Evaluate (build early -- it's standalone and testable)
 
 - [ ] Port the recall rule faithfully: true IoU, `inter / (len1 + len2 - inter)`
 - [ ] Half-open spans, `length = last - first`, no `+1`
@@ -338,7 +443,7 @@ both to pass; V.2 makes `lint` mandatory.
       meaningless
 - [ ] Complement test: empty `retrieved_sources` -> 0.0
 
-## Stage 5 -- Answer generation
+## Stage 6 -- Answer generation
 
 - [ ] Qwen/Qwen3-0.6B, weights outside the repo (`HF_HOME` already points to
       `/sgoinfre` on campus)
@@ -351,7 +456,7 @@ both to pass; V.2 makes `lint` mandatory.
 - [ ] `answer_dataset` copies `retrieved_sources` from its input file
 - [ ] Output `StudentSearchResultsAndAnswer`
 
-## Stage 6 -- Robustness (VI.6 edge cases)
+## Stage 7 -- Robustness (VI.6 edge cases)
 
 - [ ] Empty query
 - [ ] Nonsensical query
@@ -362,7 +467,7 @@ both to pass; V.2 makes `lint` mandatory.
 - [ ] tqdm progress bars on `index` and `search_dataset` (V.4 requires them,
       and `tqdm` is not yet in `pyproject.toml` dependencies)
 
-## Stage 7 -- Submission
+## Stage 8 -- Submission
 
 - [ ] README: italic first line, Description, Instructions, Resources
 - [ ] README: System architecture, Chunking strategy, Retrieval method,
@@ -376,7 +481,7 @@ both to pass; V.2 makes `lint` mandatory.
 - [ ] `make lint-strict` actually runs both tools
 - [ ] `make debug` points at a runnable script
 
-## Stage 8 -- Bonus (only after the mandatory part fully validates)
+## Stage 9 -- Bonus (only after the mandatory part fully validates)
 
 - [ ] 1. Semantic embeddings (`all-MiniLM-L6-v2`) alongside the lexical index
 - [ ] 2. Hybrid retrieval -- **RRF** (`1/(c + rank)`), not weighted score sums;
@@ -392,8 +497,9 @@ both to pass; V.2 makes `lint` mandatory.
 
 | Decision | Blocks | Options |
 |---|---|---|
-| Oversized-node fallback | Stage 1 | recurse into nested defs / fixed-size windows / merge siblings |
-| Index format | Stage 2 | pickle / JSON / SQLite |
-| Middleware for BM25 | Stage 3 | Lucene `+1` IDF (safer) vs Robertson (negative on code) |
-| `b` and `k1` | Stage 3 | sweep; chunks vary ~40x in length so `b` will move recall |
-| Retrieval `k` vs generation `k` | Stage 5 | same `k`, or wide retrieval + narrow context |
+| Oversized-node fallback | -- | **DECIDED** -- equal parts, line-aligned, 1 overlap line |
+| Where the suffix rule lives | Stage 1 | in `Manager.index`, or a factory in the chunking package |
+| Index format | Stage 3 | pickle / JSON / SQLite |
+| IDF variant | Stage 4 | Lucene `+1` (safer) vs Robertson (goes negative on code) |
+| `b` and `k1` | Stage 4 | sweep; chunks vary ~40x in length so `b` will move recall |
+| Retrieval `k` vs generation `k` | Stage 6 | same `k`, or wide retrieval + narrow context |

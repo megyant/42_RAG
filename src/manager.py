@@ -1,5 +1,7 @@
 from .ingesting import Ingest
 from .helpers import ParseError
+from .models import ChunkData
+from .chunking import Chunk
 
 
 class Manager:
@@ -7,11 +9,8 @@ class Manager:
         self.raw_path = raw_path
         self.processed_path = processed_path
 
-    def ingest(self):
-        ingest = Ingest(self.raw_path)
-        files = ingest.collect_files()
-        for file in files:
-            ingest.read_file(file)
+    def pipeline(self):
+        ...
 
     def index(self, max_chunk_size: int) -> None:
         try:
@@ -25,6 +24,22 @@ class Manager:
             raise ParseError("'max_chunk_size' needs to be >= 1")
         if max_chunk_size > 2000:
             raise ParseError("'max_chunk_size' needs to be <= 2000")
+
+        ingest = Ingest(self.raw_path)
+        chunks: list[ChunkData] = []
+
+        for path in ingest.collect_files():
+            chunker = Chunk.selection(path, max_chunk_size)
+            if chunker is None:
+                continue
+
+            text = ingest.read_file(path)
+            if text is None:
+                continue
+
+            chunks += chunker.chunk(path, text)
+
+        print(f"Indexed {len(chunks)} chunks -> {self.processed_path}")
 
     def search(self, query: str, k: int):
         try:
