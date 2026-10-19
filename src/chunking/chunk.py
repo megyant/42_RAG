@@ -12,7 +12,7 @@ class Chunk (ABC):
         ...
 
     @classmethod
-    def selection(cls, path: Path, max_chunk_size: int) -> "Chunk | None":
+    def strategy(cls, path: Path) -> type["Chunk"] | None:
         from .chunk_code import ChunkCode
         from .chunk_markdown import ChunkMarkdown
 
@@ -24,7 +24,4 @@ class Chunk (ABC):
 
         selected = file_type.get(path.suffix.lower())
 
-        if selected is None:
-            return None
-
-        return selected(max_chunk_size)
+        return selected

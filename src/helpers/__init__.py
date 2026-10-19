@@ -1,5 +1,7 @@
 from .colors import Colors
 from .errors import CliError, ParseError
+from .const import RAW_PATH, PROCESSED_PATH
 
 
-__all__ = ["Colors", "CliError", "ParseError"]
+__all__ = ["Colors", "CliError", "ParseError", "RAW_PATH",
+           "PROCESSED_PATH"]

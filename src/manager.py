@@ -27,11 +27,15 @@ class Manager:
 
         ingest = Ingest(self.raw_path)
         chunks: list[ChunkData] = []
+        chunks_by_type = dict[type[Chunk], Chunk] = {}
 
         for path in ingest.collect_files():
-            chunker = Chunk.selection(path, max_chunk_size)
-            if chunker is None:
+            strategy = Chunk.strategy(path)
+            if strategy is None:
                 continue
+
+            if strategy not in chunks_by_type:
+                chunks_by_type[strategy] = strategy(max_chunk_size)
 
             text = ingest.read_file(path)
             if text is None:
