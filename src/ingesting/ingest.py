@@ -3,7 +3,7 @@ from src.helpers import RAW_PATH
 
 
 def collect_files(raw_path: str = RAW_PATH) -> list[Path]:
-    root = Path(RAW_PATH)
+    root = Path(raw_path)
     suffixes = [".py", ".md", ".txt"]
 
     files: list[Path] = []
@@ -17,15 +17,15 @@ def collect_files(raw_path: str = RAW_PATH) -> list[Path]:
 
 def read_file(path: Path) -> str | None:
     try:
-        with open(RAW_PATH, encoding="utf-8", newline="") as f:
+        with open(path, encoding="utf-8", newline="") as f:
             text = f.read()
         return text
     except OSError as e:
-        print(f'Could not read "{RAW_PATH}": {e.strerror}.')
+        print(f'Could not read "{path}": {e.strerror}.')
         return None
 
     except UnicodeDecodeError as e:
-        print(f'Could not decode "{RAW_PATH}": '
+        print(f'Could not decode "{path}": '
               f'{e.reason.capitalize()}.')
         return None
 
