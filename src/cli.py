@@ -47,7 +47,7 @@ class Cli:
         ...
 
     def answer(self, query: str, k: int) -> None:
-        Manager().answer(query, k)
+        ...
 
     def answer_dataset(self, student_search_results_path: str,
                        save_directory: str) -> None:
