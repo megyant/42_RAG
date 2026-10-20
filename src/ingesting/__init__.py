@@ -1,4 +1,4 @@
-from .ingest import Ingest
+from .ingest import collect_files, read_file
 
 
-__all__ = ["Ingest"]
+__all__ = ["collect_files", "read_file"]

@@ -1,6 +1,6 @@
-from .chunk import Chunk
+from .chunk import Chunk, chunk_markdown, chunk_python, chunk_text
 from .chunk_code import ChunkCode
-from .chunk_markdown import ChunkMarkdown
 
 
-__all__ = ["Chunk", "ChunkCode", "ChunkMarkdown"]
+__all__ = ["Chunk", "ChunkCode", "ChunkMarkdown", "chunk_markdown",
+           "chunk_python", "chunk_text"]

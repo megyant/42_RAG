@@ -2,7 +2,7 @@ from pathlib import Path
 from src.helpers import RAW_PATH
 
 
-def collect_files(RAW_PATH) -> list[Path]:
+def collect_files(raw_path: str = RAW_PATH) -> list[Path]:
     root = Path(RAW_PATH)
     suffixes = [".py", ".md", ".txt"]
 
@@ -15,7 +15,7 @@ def collect_files(RAW_PATH) -> list[Path]:
     return sorted(files)
 
 
-def read_file(Path: Path) -> str | None:
+def read_file(path: Path) -> str | None:
     try:
         with open(RAW_PATH, encoding="utf-8", newline="") as f:
             text = f.read()
@@ -28,3 +28,12 @@ def read_file(Path: Path) -> str | None:
         print(f'Could not decode "{RAW_PATH}": '
               f'{e.reason.capitalize()}.')
         return None
+
+
+"""
+index
+1. Grabs the path of each file
+2. diverts each file to the correct chunker
+3. reads the file
+4. creates the chunks
+"""

@@ -1,4 +1,3 @@
-from .ingesting import Ingest
 from .helpers import ParseError
 from .models import ChunkData
 from .chunking import Chunk
