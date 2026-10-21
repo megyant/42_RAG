@@ -1,6 +1,7 @@
 from .parser.parse_values import parse_max_chunk_size
 from .ingesting import collect_files
 from .chunking import chunk_markdown, chunk_text, chunk_python
+from .helpers import ParseError
 
 """
 index –max_chunk_size <int>
@@ -40,7 +41,16 @@ class Cli:
                 chunk_text(max_chunk_size, path)
 
     def search(self, query: str, k: int = 10) -> None:
-        ...
+        try:
+            k = int(k)
+        except ValueError:
+            raise ParseError(f"'k'({k}) must be an integer")
+
+        if k <= 0:
+            raise ParseError("'k' needs to be > 0")
+
+        if query is None:
+            raise ParseError("'query' cannot be empty")
 
     def search_dataset(self, dataset_path: str, save_directory: str,
                        k: int = 10) -> None:

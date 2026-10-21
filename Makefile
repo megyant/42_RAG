@@ -8,7 +8,7 @@ MYPY_FLAGS = --warn-return-any --warn-unused-ignores \
              --ignore-missing-imports --disallow-untyped-defs \
              --check-untyped-defs
 
-ARGS = index --max_chunk_size 0
+ARGS = index --max_chunk_size 2000
 
 install:
 	@if ! command -v uv >/dev/null 2>&1; then \

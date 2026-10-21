@@ -16,7 +16,7 @@ dependencies = [
 ]
 
 [tool.uv.sources]
-llm-sdk = {path = "llm_sdk"}
+vllm = {path = "data/raw/vllm*"}
 
 [tool.flake8]
 extend-exclude = [
@@ -32,9 +32,8 @@ extend-exclude = [
 exclude = [
     ".venv",
     "vllm-*",
-    "llm_sdk",
     "others_to_delete",
     ".vscode",
     ".mypy_cache",
-    "__pycahe__"
+    "__pycache__"
 ]
