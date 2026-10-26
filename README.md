@@ -28,3 +28,45 @@ sources:
 
 
 BM25 is the reference
+
+
+
+How to import the llm:
+
+import torch
+from transformers import AutoModelForCausalLM, AutoTokenizer
+
+self.tokenizer = AutoTokenizer.from_pretrained(model_name)
+self.model = AutoModelForCausalLM.from_pretrained(
+    model_name,
+    dtype=torch.float32,   # explicit; v5.17 otherwise uses "auto" (likely bf16)
+).eval()
+
+def generate(self, context: str, question: str) -> str:
+    messages = [
+        {"role": "system", "content": "Answer using only the provided context."},
+        {"role": "user", "content": f"Context:\n{context}\n\nQuestion: {question}"},
+    ]
+    prompt = self.tokenizer.apply_chat_template(
+        messages,
+        tokenize=False,
+        add_generation_prompt=True,
+        enable_thinking=False,   # Qwen3: avoid long thinking on CPU
+    )
+    inputs = self.tokenizer(
+        prompt,
+        return_tensors="pt",
+        truncation=True,
+        max_length=8192,         # keep CPU context manageable
+    )
+    with torch.inference_mode():
+        output_ids = self.model.generate(
+            **inputs,
+            max_new_tokens=128,
+            do_sample=False,
+            repetition_penalty=1.15,
+            eos_token_id=self.tokenizer.eos_token_id,
+            pad_token_id=self.tokenizer.eos_token_id,
+        )
+    generated = output_ids[0][inputs["input_ids"].shape[1]:]
+    return self.tokenizer.decode(generated, skip_special_tokens=True).strip()

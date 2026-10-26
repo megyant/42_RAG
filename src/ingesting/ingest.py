@@ -1,5 +1,6 @@
 from pathlib import Path
 from src.helpers import RAW_PATH
+import re
 
 
 def collect_files(raw_path: str = RAW_PATH) -> list[Path]:
@@ -18,8 +19,7 @@ def collect_files(raw_path: str = RAW_PATH) -> list[Path]:
 def read_file(path: Path) -> str | None:
     try:
         with open(path, encoding="utf-8", newline="") as f:
-            text = f.read()
-        return text
+            return f.read()
     except OSError as e:
         print(f'Could not read "{path}": {e.strerror}.')
         return None
@@ -28,6 +28,10 @@ def read_file(path: Path) -> str | None:
         print(f'Could not decode "{path}": '
               f'{e.reason.capitalize()}.')
         return None
+
+
+def split_endings(text: str) -> list[str]:
+    return re.findall("[^\r\n]*(?:\r\n|\r|\n)|[^\r\n]+$", text)
 
 
 """

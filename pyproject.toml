@@ -15,9 +15,6 @@ dependencies = [
     "vllm>=0.10.1"
 ]
 
-[tool.uv.sources]
-vllm = {path = "data/raw/vllm*"}
-
 [tool.flake8]
 extend-exclude = [
     ".venv",

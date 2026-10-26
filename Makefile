@@ -32,7 +32,7 @@ run: install
 	@if [ -d /sgoinfre ]; then \
 		HF_HOME=$(SGOINFRE_HF) UV_CACHE_DIR=$(SGOINFRE_CACHE) uv run python -m src $(ARGS); \
 	else \
-		uv run python -m src $(ARGS); \
+		uv run python3 -m src $(ARGS); \
 	fi || true
 	
 
