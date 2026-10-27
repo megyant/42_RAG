@@ -3,10 +3,11 @@ from ..ingesting import read_file, split_endings
 import ast
 
 
-def chunk_python(max_chunk_size: int, path: Path):
-    overlap = max_chunk_size // 10
-    
-    text = read_file(path)
+def chunk_python(max_chunk_size: int, file: Path):
+    print("Chunking a .py file")
+    overlap = int(max_chunk_size * 0.10)
+
+    text = read_file(file)
     if text is None:
         return []
 
@@ -18,8 +19,8 @@ def chunk_python(max_chunk_size: int, path: Path):
     try:
         tree = ast.parse(text)
     except (SyntaxError, ValueError, RecursionError):
-        print(f'"AST failed for {path}, falling back to line chunking')
-        return []
+        print(f'\nAST failed for {file}, falling back to line chunking\n')
+        return manual_split(max_chunk_size, overlap, text)
 
 
 """     for node in tree.body:
@@ -32,22 +33,42 @@ def chunk_python(max_chunk_size: int, path: Path):
         # Type(class, function, etc), beginning, end """
 
 
-def manual_split(max_chunk_size: int, overlap: int, text: str) -> dict[int, int, str]:
-    ...
+def manual_split(max_chunk_size: int, overlap: int,
+                 text: str) -> list[dict[str, str | int]]:
+    result: list[dict[str, str | int]] = []
+    start = 0
+    count = 0
+
+    while start < len(text):
+        end = start + max_chunk_size
+
+        chunk: dict[str, str | int] = {
+            "start": start,
+            "end": end,
+            "text":  text[start:end]
+        }
+        count += 1
+        result.append(chunk)
+        start += (max_chunk_size - overlap)
+
+    print(f"Result: {len(result)}")
+
+    return result
 
 
 def chunk_markdown(max_chunk_size: int, file: Path):
-    print("Sucessfully diverted to chunk_markdown")
+    ...
 
 
-def chunk_text(max_chunk_size: int, file: Path):
-    print("Sucessfully diverted to chunk_text")
+def chunk_text(max_chunk_size: int,
+               file: Path) -> list[dict[str, str | int]]:
+    print("Chunking a .txt file")
 
+    overlap = int(max_chunk_size * 0.10)
+    text = read_file(file)
+    if text is None:
+        return []
 
-"""
-How to divide a python file
+    result = manual_split(max_chunk_size, overlap, text)
 
-1. class
-
-2. methods
-"""
+    return result

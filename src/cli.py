@@ -23,7 +23,7 @@ evaluate –student_search_results_path <path> –dataset_path <path>
 
 
 class Cli:
-    def index(self, max_chunk_size: int = 2000) -> None:
+    def index(self, max_chunk_size: int = 2000) -> int:
         max_chunk_size = parse_max_chunk_size(max_chunk_size)
 
         all_paths = collect_files()
@@ -39,6 +39,8 @@ class Cli:
 
             elif suffix == ".txt":
                 chunk_text(max_chunk_size, path)
+
+        return max_chunk_size
 
     def search(self, query: str, k: int = 10) -> None:
         try:
