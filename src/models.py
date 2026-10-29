@@ -7,7 +7,8 @@ class MinimalSource(BaseModel):
     file_path: str
     first_character_index: int
     last_character_index: int
-    text: str
+    size: int
+    content: str
 
 
 class UnansweredQuestion(BaseModel):
