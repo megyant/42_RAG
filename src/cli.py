@@ -1,6 +1,6 @@
 from .parser.parse_values import parse_max_chunk_size
 from .ingesting import collect_files
-from .chunking import chunk_markdown, chunk_text, chunk_python
+from .chunking import Chunk
 from .helpers import ParseError
 
 """
@@ -23,24 +23,23 @@ evaluate –student_search_results_path <path> –dataset_path <path>
 
 
 class Cli:
-    def index(self, max_chunk_size: int = 2000) -> int:
+    def index(self, max_chunk_size: int = 2000):
         max_chunk_size = parse_max_chunk_size(max_chunk_size)
 
         all_paths = collect_files()
+        chunk = Chunk(max_chunk_size)
 
         for path in all_paths:
             suffix = path.suffix.lower()
 
             if suffix == ".py":
-                chunk_python(max_chunk_size, path)
+                chunk.chunk_python(path)
 
             elif suffix == ".md":
-                chunk_markdown(max_chunk_size, path)
+                chunk.chunk_markdown(path)
 
             elif suffix == ".txt":
-                chunk_text(max_chunk_size, path)
-
-        return max_chunk_size
+                chunk.chunk_text(path)
 
     def search(self, query: str, k: int = 10) -> None:
         try:
