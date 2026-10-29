@@ -13,7 +13,8 @@ dependencies = [
     "flake8-pyproject",
     "mypy>=2.1.0",
     "vllm>=0.10.1",
-    "langchain-text-splitters"
+    "langchain-text-splitters",
+    "tqdm"
 ]
 
 [tool.flake8]

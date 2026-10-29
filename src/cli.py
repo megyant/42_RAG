@@ -1,7 +1,9 @@
 from .parser.parse_values import parse_max_chunk_size
+from .models import MinimalSource
 from .ingesting import collect_files
 from .chunking import Chunk
 from .helpers import ParseError
+import tqdm
 
 """
 index –max_chunk_size <int>
@@ -28,18 +30,19 @@ class Cli:
 
         all_paths = collect_files()
         chunk = Chunk(max_chunk_size)
+        chunks: list[MinimalSource] = []
 
-        for path in all_paths:
+        for path in tqdm(all_paths, desc="Indexing"):
             suffix = path.suffix.lower()
 
             if suffix == ".py":
-                chunk.chunk_python(path)
+                chunks.extend(chunk.chunk_python(path))
 
             elif suffix == ".md":
-                chunk.chunk_markdown(path)
+                chunks.extend(chunk.chunk_markdown(path))
 
             elif suffix == ".txt":
-                chunk.chunk_text(path)
+                chunks.extend(chunk.chunk_text(path))
 
     def search(self, query: str, k: int = 10) -> None:
         try:
