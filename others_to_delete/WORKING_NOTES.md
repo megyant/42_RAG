@@ -253,6 +253,55 @@ one real query before any scoring.
 **DECIDED -- oversized-node split:** equal parts, line-aligned, `overlap_lines = 1`.
 See "Oversized nodes" below.
 
+### DECIDED -- `evaluate` jumps Stage 2 and Stage 4, but not Stage 1
+
+Stage 5 runs **before Stage 2** (chunking algorithms) and **before Stage 4**
+(retrieval).
+
+Why: **it is the only stage that can be finished and proved correct while no
+retrieval system exists**, and every number collected afterwards depends on it
+being right.
+
+It does **not** depend on Stage 1. Nothing here reads `data/raw/`, builds a
+chunker, or calls `ingest` -- `evaluate` reads a results JSON and a ground-truth
+dataset and touches neither the index nor the model. The two stages are
+independent; either order is valid.
+
+**Finish Stage 1 first, then Stage 5, then start chunking algorithms.** Stage 1
+is nearly closed and mechanical, and Stage 5 is no reason to leave it
+half-finished. The value of Stage 5 being early is *fail-fast* on the oracle --
+catch a format fault before the chunker, tokenizer and BM25 exist to hide it --
+and running it immediately after Stage 1 serves that just as well.
+
+```
+Stage 1  Ingest->Chunk  plumbing        <-- finish this first
+Stage 5  Evaluate       self-contained  <-- then this, before any algorithm
+Stage 2  Chunking       algorithms
+Stage 3  Persistence
+Stage 4  Retrieval      first real recall number
+```
+
+Four sub-steps, in order:
+
+1. `src/evaluating/` -- faithful port of the recall rule
+2. dataset IO -- load `RagDataset`, keyed on `question_id`
+3. oracle writer -> assert **1.0**; complement -> assert **0.0**
+4. wire `Manager.evaluate` (`Cli.evaluate` already exists and is correct)
+
+`evaluate` reads a results JSON and a ground-truth dataset. It touches neither the
+index nor the model, so the oracle file -- ground truth submitted as results --
+scores 1.0 with no chunker, no BM25 and no `k` tuning involved.
+
+**The oracle is a hard stop, not a smoke test.** If it does not score exactly
+1.0, stop there. The overlap rule is no longer an inference: it was recovered
+from the moulinette bytecode and recompiled to a byte-exact match
+(`RECALL_NOTES.md` 2). There is no "maybe I misread the rule" branch left. Every
+number gathered after a failed oracle is tuning blind, and no amount of chunker
+or BM25 work would reveal it.
+
+The complement (same file, `"retrieved_sources": []`, must score 0.0) brackets
+the metric from the other end for the cost of one loop.
+
 ## Oversized nodes -- DECIDED
 
 ### Why it had to be decided
@@ -376,21 +425,31 @@ Get one chunk coming out the other end before writing any `ast` logic. Getting
 the plumbing visible first is much easier to debug than finding it afterwards
 inside a splitter.
 
-- [ ] Fix `chunk()` signature in `chunking/chunk.py`: add `self`, add
-      annotations, accept `max_chunk_size` at construction not per call
-- [ ] `ChunkData` in `src/models.py`, extending `MinimalSource` with `text`
-- [ ] Suffix dispatch: `.py` -> `ChunkCode`, `.md` -> `ChunkMarkdown`,
-      `.txt` -> text strategy. Decide whether the rule lives in `Manager.index`
-      or as a factory in the chunking package
-- [ ] Rewrite `ingest()` -- it currently discards the text. Either return it, or
+Audited against the current code. **Four of the seven open boxes are already
+satisfied by `Manager.index`; only three remain.**
+
+- [x] Suffix dispatch: `.py` -> `ChunkCode`, `.md` -> `ChunkMarkdown`,
+      `.txt` -> text strategy. **DECIDED -- factory in the chunking package**:
+      `Chunk.selection` (`chunking/chunk.py:15-30`) already is that factory, so
+      this is no longer an open question
+- [x] Rewrite `ingest()` -- it currently discards the text. Either return it, or
       drop the separate method and let `Manager.index` walk and read in one pass
-- [ ] Handle `read_file` returning `str | None` -- skip unreadable files, never
-      pass `None` to a chunker
-- [ ] Keep walk and read in ONE loop. Do not call `collect_files()` per file
-- [ ] Build one chunker holding `max_chunk_size`, loop all files through it
-- [ ] `Manager.index` prints a confirmation + chunk count -- `Cli.index`
-      currently discards the return, so success is invisible
-- [ ] Confirm the plumbing with `ChunkCode`'s body still empty
+- [x] Handle `read_file` returning `str | None` -- `manager.py:36-37` already
+      does `if text is None: continue`, so `None` never reaches a chunker
+- [x] Keep walk and read in ONE loop. `manager.py:31` calls `collect_files()`
+      once, outside the per-file read -- not per file
+- [x] `Manager.index` prints a confirmation + chunk count -- `manager.py:42`
+- [ ] **Fix `.txt` -> `ChunkText`.** `chunk.py:22` currently routes `.txt` to
+      `ChunkMarkdown`, which contradicts the reasoning at "The chunker" above:
+      `CMakeLists.txt` has no headings, so heading-splitting fails on it.
+      Either add `ChunkText` or record why Markdown is acceptable for `.txt`
+- [ ] **Build one chunker, not one per file.** `manager.py:32` calls
+      `Chunk.selection(path, max_chunk_size)` *inside* the loop, so a fresh
+      chunker is constructed 1937 times. Cache it: build the three chunkers once,
+      or dispatch on suffix without re-instantiating
+- [ ] Confirm the plumbing with `ChunkCode`'s body still empty -- run
+      `index`; it should print `Indexed 0 chunks` and exit cleanly, since both
+      chunkers still `return []`
 
 ## Stage 2 -- Chunking algorithms
 
@@ -430,18 +489,41 @@ inside a splitter.
 - [ ] Emit an entry for **every** question; omission is a silent zero
 - [ ] Write `StudentSearchResults` with exact `data/raw/...` paths
 
-## Stage 5 -- Evaluate (build early -- it's standalone and testable)
+## Stage 5 -- Evaluate (**after Stage 1, before Stage 2**, see Build order)
 
-- [ ] Port the recall rule faithfully: true IoU, `inter / (len1 + len2 - inter)`
+The rule itself -- port it, do not re-derive it:
+- [ ] True IoU, `inter / (len1 + len2 - inter)`. Not `inter / len(gt)`, not
+      `inter / len(retrieved)`
 - [ ] Half-open spans, `length = last - first`, no `+1`
 - [ ] Strict `>` on IoU 0.05 -- exactly 0.05 must FAIL
-- [ ] Per-source 0/1 with `break`, denominator `len(true_sources)`
+- [ ] Per-source 0/1 with `break` on first hit, denominator `len(true_sources)`
 - [ ] Empty ground-truth sources -> 1.0; empty predictions -> 0.0
 - [ ] Omitted questions score 0 and still count in the denominator
-- [ ] **Oracle test:** feed ground-truth `sources` back as `retrieved_sources`,
-      must score 1.0. If not, the format is wrong and every other number is
-      meaningless
-- [ ] Complement test: empty `retrieved_sources` -> 0.0
+- [ ] Unknown `question_id` reported clearly -- do NOT paper it over as a zero,
+      the real grader raises `KeyError` and the run dies
+
+Plumbing it needs:
+- [ ] `src/evaluating/` -- new package, keeps the metric out of `manager.py`
+- [ ] Dataset IO: load `RagDataset` from `AnsweredQuestions/*.json`
+- [ ] Key on `question_id`, **not** position. The four dataset files do line up
+      positionally today (identical id sets, identical order, 99/99 and
+      100/100), but the private set may not oblige, and a wrong key is fatal
+- [ ] Report recall@1, @3, @5, @10. The moulinette reports exactly these
+      (`k_values = [1, 3, 5, 10]`) and VI.1 demands a chunk-size sweep, so a
+      single number is never the deliverable
+- [ ] **No import from `others_to_delete/` anywhere under `src/`.** Reading the
+      grader is not calling it -- VI.6 forbids the latter. Keeping the recovered
+      code outside the solution tree makes that structural, not a promise
+
+The two bracketing tests:
+- [ ] **Oracle:** feed ground-truth `sources` back as `retrieved_sources`, write
+      to `data/output/search_results/AnsweredQuestions/`, assert **1.0**. If not
+      1.0, the format is wrong and every other number is meaningless
+- [ ] **Complement:** same file with `"retrieved_sources": []` -> assert **0.0**
+- [ ] Pre-flight on the oracle file before scoring: every `question_id` present
+      in the ground truth, and no span wider than 2000 by `last - first`
+- [ ] Wire `Manager.evaluate`. `Cli.evaluate` is already correct and needs no
+      change
 
 ## Stage 6 -- Answer generation
 
@@ -498,7 +580,7 @@ inside a splitter.
 | Decision | Blocks | Options |
 |---|---|---|
 | Oversized-node fallback | -- | **DECIDED** -- equal parts, line-aligned, 1 overlap line |
-| Where the suffix rule lives | Stage 1 | in `Manager.index`, or a factory in the chunking package |
+| Where the suffix rule lives | Stage 1 | **DECIDED** -- factory in the chunking package: `Chunk.selection` (`chunking/chunk.py:15-30`) already is one |
 | Index format | Stage 3 | pickle / JSON / SQLite |
 | IDF variant | Stage 4 | Lucene `+1` (safer) vs Robertson (goes negative on code) |
 | `b` and `k1` | Stage 4 | sweep; chunks vary ~40x in length so `b` will move recall |

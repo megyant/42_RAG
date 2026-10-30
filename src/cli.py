@@ -2,8 +2,9 @@ from .parser.parse_values import parse_max_chunk_size
 from .models import MinimalSource
 from .ingesting import collect_files
 from .chunking import Chunk
-from .helpers import ParseError
-import tqdm
+from .helpers import ParseError, PROCESSED_PATH
+from .json import load_json
+from tqdm import tqdm
 
 """
 index –max_chunk_size <int>
@@ -43,6 +44,8 @@ class Cli:
 
             elif suffix == ".txt":
                 chunks.extend(chunk.chunk_text(path))
+        
+        load_json(chunks=chunks)
 
     def search(self, query: str, k: int = 10) -> None:
         try:
