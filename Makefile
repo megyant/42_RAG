@@ -47,9 +47,14 @@ clean:
 	find . -type d -name "__pycache__" -exec rm -rf {} +
 	rm -rf .mypy_cache
 
-lint:
+flake8:
 	uv run flake8 .
+
+mypy:
 	uv run mypy . $(MYPY_FLAGS)
 
+lint: flake8 mypy
+	
+
 lint-strict: flake8
-	uv run mypy . --strict
+	uv run mypy . $(MYPY_FLAGS) --strict
