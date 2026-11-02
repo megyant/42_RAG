@@ -427,14 +427,13 @@ TODOs.
       currently untracked and not ignored, so one `git add .` commits ~30 MB
 - [ ] Rename `src/json.py` (shares the stdlib name) -> e.g. `storage.py`, and
       `load_json` -> `save_index`, since it writes. The real loader comes next
-- [ ] `CliArgs` is empty -- give it the shared config:
-      `ConfigDict(str_strip_whitespace=True, coerce_numbers_to_str=True,
-      extra="forbid")`, and `strict=True` on the int fields (Fire passes
-      `True` for a bare `--k`; lax int turns that into `1`)
-- [ ] Move the `ValidationError -> ParseError` loop out of `Cli.index` into one
-      helper (`validate_args(Model, **kwargs)`), so every command reuses it
 - [ ] `Cli.search` still does the manual `int(k)` checks -- switch it to
-      `SearchArgs`
+      `SearchArgs`, with the same `try/except ValidationError` as `Cli.index`
+- [ ] Edge cases to test by hand once `search` uses `SearchArgs`:
+      `search "   "` (whitespace-only query passes `min_length=1`),
+      `search 123` (Fire passes an int, pydantic rejects it as "not a valid
+      string"), `search hi --k` (Fire passes `True`; `strict=True` on `k`
+      already rejects it)
 - [ ] Decide the chunk model: `MinimalSource` carries `size` + `content`,
       `ChunkData` adds `text` (duplicate of `content`). Suggested: keep
       `MinimalSource` exactly as the subject defines it, put `content` on
