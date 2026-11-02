@@ -405,6 +405,71 @@ both to pass; V.2 makes `lint` mandatory.
 
 # TO BE DONE
 
+## Next steps -- status as of 2026-11-02 (commit `9e8026c`)
+
+**Where things stand:** chunking is done with `langchain_text_splitters`
+(`Chunk` class, `.py` / `.md` / `.txt`), and `index` writes
+`data/processed/chunks.json` through pydantic. Measured on the full corpus:
+14,634 chunks in ~0.8 s, every `text[first:last] == content`, and no chunk wider
+than 2000. Stages 0-2 below describe the earlier Manager + `ast` plan; there is
+no `Manager` and no `ChunkCode` in `src/` now, so read them as history, not as
+TODOs.
+
+### A. Tidy up what was just written (small, do first)
+
+- [ ] mypy: 3 missing return types -- `Cli.index` (`cli.py:30`),
+      `Chunk.chunk_markdown` (`chunk.py:62`), `load_json` (`json.py:11`).
+      flake8 is clean
+- [ ] `__main__.py`: the `except Exception` branch prints but exits **0**. Add
+      `sys.exit(1)` so a failure is a failure (KeyboardInterrupt too, usually
+      `130`)
+- [ ] `.gitignore`: add `data/processed/` and `data/output/`. `chunks.json` is
+      currently untracked and not ignored, so one `git add .` commits ~30 MB
+- [ ] Rename `src/json.py` (shares the stdlib name) -> e.g. `storage.py`, and
+      `load_json` -> `save_index`, since it writes. The real loader comes next
+- [ ] `CliArgs` is empty -- give it the shared config:
+      `ConfigDict(str_strip_whitespace=True, coerce_numbers_to_str=True,
+      extra="forbid")`, and `strict=True` on the int fields (Fire passes
+      `True` for a bare `--k`; lax int turns that into `1`)
+- [ ] Move the `ValidationError -> ParseError` loop out of `Cli.index` into one
+      helper (`validate_args(Model, **kwargs)`), so every command reuses it
+- [ ] `Cli.search` still does the manual `int(k)` checks -- switch it to
+      `SearchArgs`
+- [ ] Decide the chunk model: `MinimalSource` carries `size` + `content`,
+      `ChunkData` adds `text` (duplicate of `content`). Suggested: keep
+      `MinimalSource` exactly as the subject defines it, put `content` on
+      `ChunkData`, store `ChunkData` in the index, emit plain `MinimalSource`
+      in search output (otherwise every retrieved source carries 2000 chars)
+- [ ] Makefile: `lint-strict: flake8` depends on a target that doesn't exist
+
+### B. Finish persistence (Stage 3)
+
+- [ ] `load_index(processed_path) -> list[ChunkData]` next to `save_index`:
+      `model_validate_json`, catch `OSError` / `ValidationError`, and a missing
+      file -> `CliError("No index found, run 'index' first")`
+- [ ] On load, assert no span exceeds 2000 (`last - first`) -- one oversized
+      source invalidates the whole output for the moulinette
+
+### C. Retrieval (Stage 4) -- the next real feature
+
+- [ ] Tokenizer shared by index and query; split `snake_case` / `CamelCase` AND
+      keep the whole identifier (70/99 code questions quote identifiers)
+- [ ] BM25 (own implementation or `rank_bm25`) built from `content` right after
+      loading; only persist tokens/stats if load time turns out to matter
+- [ ] Load the index once per process, never per question (90 s / 200 q budget)
+- [ ] `search <query> --k`: print ranked `file_path` + span
+- [ ] `search_dataset`: read `RagDataset`, one entry for **every** question,
+      write `StudentSearchResults` to `<save_directory>/<dataset filename>`,
+      tqdm over questions, `indent=4`
+- [ ] Run the moulinette on docs + code: targets recall@5 >= 0.80 docs,
+      >= 0.50 code
+
+### D. Then
+
+- [ ] Stage 5 `evaluate` (own recall@k, rules listed below)
+- [ ] Stage 6 answer generation with Qwen3-0.6B
+- [ ] Stage 7 edge cases, Stage 8 README + chunk-size sweep, Stage 9 bonus
+
 ## Stage 0 -- Foundations (do first, nothing else is testable without these)
 
 - [x] `ChunkData` in `src/models.py`, extending `MinimalSource` with `text`
@@ -469,8 +534,8 @@ satisfied by `Manager.index`; only three remain.**
 
 ## Stage 3 -- Persistence
 
-- [ ] Pick format: pickle / JSON / SQLite
-- [ ] Write to `data/processed/`
+- [x] Pick format: JSON (single `chunks.json`, pydantic `ChunkIndex`)
+- [x] Write to `data/processed/`
 - [ ] Assert on load that no span exceeds 2000
 - [ ] Round-trip check against the original files after reload
 - [ ] Determinism of the persisted artifact
@@ -581,7 +646,7 @@ The two bracketing tests:
 |---|---|---|
 | Oversized-node fallback | -- | **DECIDED** -- equal parts, line-aligned, 1 overlap line |
 | Where the suffix rule lives | Stage 1 | **DECIDED** -- factory in the chunking package: `Chunk.selection` (`chunking/chunk.py:15-30`) already is one |
-| Index format | Stage 3 | pickle / JSON / SQLite |
+| Index format | Stage 3 | **DECIDED** -- JSON, one `data/processed/chunks.json` |
 | IDF variant | Stage 4 | Lucene `+1` (safer) vs Robertson (goes negative on code) |
 | `b` and `k1` | Stage 4 | sweep; chunks vary ~40x in length so `b` will move recall |
 | Retrieval `k` vs generation `k` | Stage 6 | same `k`, or wide retrieval + narrow context |
