@@ -59,7 +59,7 @@ class Chunk:
 
         return result
 
-    def chunk_markdown(self, file: Path):
+    def chunk_markdown(self, file: Path) -> list[MinimalSource]:
         text = read_file(file)
         if text is None:
             return []

@@ -3,7 +3,7 @@ from .models import MinimalSource
 from .ingesting import collect_files
 from .chunking import Chunk
 from .helpers import ParseError
-from .json import load_json
+from .create_data_results import save_index
 from tqdm import tqdm
 from pydantic import ValidationError
 
@@ -27,7 +27,7 @@ evaluate –student_search_results_path <path> –dataset_path <path>
 
 
 class Cli:
-    def index(self, max_chunk_size: int = 2000):
+    def index(self, max_chunk_size: int = 2000) -> None:
         try:
             args = IndexArgs(max_chunk_size=max_chunk_size)
         except ValidationError as e:
@@ -50,7 +50,7 @@ class Cli:
             elif suffix == ".txt":
                 chunks.extend(chunk.chunk_text(path))
 
-        load_json(chunks=chunks)
+        save_index(chunks=chunks)
 
     def search(self, query: str, k: int = 10) -> None:
         try:

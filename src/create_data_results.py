@@ -8,8 +8,8 @@ class ChunkIndex(BaseModel):
     chunks: list[MinimalSource]
 
 
-def load_json(chunks: list[MinimalSource],
-              output_path: str = PROCESSED_PATH):
+def save_index(chunks: list[MinimalSource],
+               output_path: str = PROCESSED_PATH) -> None:
 
     output_dir = Path(output_path)
 
