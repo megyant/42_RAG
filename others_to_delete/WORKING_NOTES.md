@@ -417,15 +417,15 @@ TODOs.
 
 ### A. Tidy up what was just written (small, do first)
 
-- [ ] mypy: 3 missing return types -- `Cli.index` (`cli.py:30`),
+- [x] mypy: 3 missing return types -- `Cli.index` (`cli.py:30`),
       `Chunk.chunk_markdown` (`chunk.py:62`), `load_json` (`json.py:11`).
       flake8 is clean
-- [ ] `__main__.py`: the `except Exception` branch prints but exits **0**. Add
+- [x] `__main__.py`: the `except Exception` branch prints but exits **0**. Add
       `sys.exit(1)` so a failure is a failure (KeyboardInterrupt too, usually
       `130`)
-- [ ] `.gitignore`: add `data/processed/` and `data/output/`. `chunks.json` is
+- [x] `.gitignore`: add `data/processed/` and `data/output/`. `chunks.json` is
       currently untracked and not ignored, so one `git add .` commits ~30 MB
-- [ ] Rename `src/json.py` (shares the stdlib name) -> e.g. `storage.py`, and
+- [x] Rename `src/json.py` (shares the stdlib name) -> e.g. `storage.py`, and
       `load_json` -> `save_index`, since it writes. The real loader comes next
 - [ ] `Cli.search` still does the manual `int(k)` checks -- switch it to
       `SearchArgs`, with the same `try/except ValidationError` as `Cli.index`
@@ -439,7 +439,7 @@ TODOs.
       `MinimalSource` exactly as the subject defines it, put `content` on
       `ChunkData`, store `ChunkData` in the index, emit plain `MinimalSource`
       in search output (otherwise every retrieved source carries 2000 chars)
-- [ ] Makefile: `lint-strict: flake8` depends on a target that doesn't exist
+- [x] Makefile: `lint-strict: flake8` depends on a target that doesn't exist
 
 ### B. Finish persistence (Stage 3)
 
