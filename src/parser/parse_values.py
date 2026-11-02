@@ -1,17 +1,15 @@
-from src.helpers import ParseError
+from src.helpers import MAX_CHUNK_SIZE
+from pydantic import BaseModel, Field
 
 
-def parse_max_chunk_size(max_chunk_size: int) -> int:
-    try:
-        max_chunk_size = int(max_chunk_size)
-    except ValueError:
-        raise ParseError("'max_chunk_size' "
-                         f"({max_chunk_size}) "
-                         "must be an integer")
+class CliArgs(BaseModel):
+    ...
 
-    if max_chunk_size < 1:
-        raise ParseError("'max_chunk_size' needs to be >= 1")
-    if max_chunk_size > 2000:
-        raise ParseError("'max_chunk_size' needs to be <= 2000")
 
-    return max_chunk_size
+class IndexArgs(CliArgs):
+    max_chunk_size: int = Field(MAX_CHUNK_SIZE, ge=100, le=MAX_CHUNK_SIZE)
+
+
+class SearchArgs(CliArgs):
+    query: str = Field(min_length=1)
+    k: int = Field(10, ge=1, strict=True)

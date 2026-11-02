@@ -1,10 +1,11 @@
-from .parser.parse_values import parse_max_chunk_size
+from .parser.parse_values import IndexArgs
 from .models import MinimalSource
 from .ingesting import collect_files
 from .chunking import Chunk
-from .helpers import ParseError, PROCESSED_PATH
+from .helpers import ParseError
 from .json import load_json
 from tqdm import tqdm
+from pydantic import ValidationError
 
 """
 index –max_chunk_size <int>
@@ -27,10 +28,14 @@ evaluate –student_search_results_path <path> –dataset_path <path>
 
 class Cli:
     def index(self, max_chunk_size: int = 2000):
-        max_chunk_size = parse_max_chunk_size(max_chunk_size)
+        try:
+            args = IndexArgs(max_chunk_size=max_chunk_size)
+        except ValidationError as e:
+            msgs = [f"'{err['loc'][0]}' - {err['msg']}" for err in e.errors()]
+            raise ParseError("\n".join(msgs))
 
         all_paths = collect_files()
-        chunk = Chunk(max_chunk_size)
+        chunk = Chunk(args.max_chunk_size)
         chunks: list[MinimalSource] = []
 
         for path in tqdm(all_paths, desc="Indexing"):
@@ -44,7 +49,7 @@ class Cli:
 
             elif suffix == ".txt":
                 chunks.extend(chunk.chunk_text(path))
-        
+
         load_json(chunks=chunks)
 
     def search(self, query: str, k: int = 10) -> None:
