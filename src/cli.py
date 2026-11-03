@@ -1,11 +1,12 @@
-from .parser.parse_values import IndexArgs
-from .models import MinimalSource
+from .parser.parse_values import IndexArgs, SearchArgs
+from .models import DataSource
 from .ingesting import collect_files
 from .chunking import Chunk
-from .helpers import ParseError
+from .helpers import ParseError, PROCESSED_PATH
 from .create_data_results import save_index
 from tqdm import tqdm
 from pydantic import ValidationError
+import os
 
 """
 index –max_chunk_size <int>
@@ -32,11 +33,11 @@ class Cli:
             args = IndexArgs(max_chunk_size=max_chunk_size)
         except ValidationError as e:
             msgs = [f"'{err['loc'][0]}' - {err['msg']}" for err in e.errors()]
-            raise ParseError("\n".join(msgs))
+            raise ParseError("\n".join(msgs)) from None
 
         all_paths = collect_files()
         chunk = Chunk(args.max_chunk_size)
-        chunks: list[MinimalSource] = []
+        chunks: list[DataSource] = []
 
         for path in tqdm(all_paths, desc="Indexing"):
             suffix = path.suffix.lower()
@@ -54,15 +55,14 @@ class Cli:
 
     def search(self, query: str, k: int = 10) -> None:
         try:
-            k = int(k)
-        except ValueError:
-            raise ParseError(f"'k'({k}) must be an integer")
+            args = SearchArgs(k=k, query=query)
+        except ValidationError as e:
+            msgs = [f"'{err['loc'][0]}' - {err['msg']}" for err in e.errors()]
+            raise ParseError("\n".join(msgs)) from None
 
-        if k <= 0:
-            raise ParseError("'k' needs to be > 0")
-
-        if query is None:
-            raise ParseError("'query' cannot be empty")
+        if os.path.exists(PROCESSED_PATH) is False:
+            raise ParseError(f"Could not find '{PROCESSED_PATH}'. "
+                             "Please run python3 -m index.")
 
     def search_dataset(self, dataset_path: str, save_directory: str,
                        k: int = 10) -> None:

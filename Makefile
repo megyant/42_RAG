@@ -25,7 +25,7 @@ install:
 		ln -sfn $(SGOINFRE_VENV) .venv; \
 	else \
 		uv sync; \
-	fi
+	fi || true
 
 
 run: install
@@ -44,8 +44,14 @@ debug: install
 	fi
 
 clean:
+	rm -rf data/processed
 	find . -type d -name "__pycache__" -exec rm -rf {} +
 	rm -rf .mypy_cache
+
+# fclean:
+# 	rm -rf data
+# 	rm -rf moulinette_RAG
+# 	rm -rf others_to_delete
 
 flake8:
 	uv run flake8 .

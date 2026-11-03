@@ -14,7 +14,9 @@ dependencies = [
     "mypy>=2.1.0",
     "vllm>=0.10.1",
     "langchain-text-splitters",
-    "tqdm"
+    "tqdm",
+    "bm25s",
+    "PyStemmer"
 ]
 
 [tool.flake8]

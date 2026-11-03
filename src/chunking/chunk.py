@@ -2,7 +2,7 @@ from pathlib import Path
 from ..ingesting import read_file
 from langchain_text_splitters import (Language,
                                       RecursiveCharacterTextSplitter)
-from ..models import MinimalSource
+from ..models import DataSource
 from ..helpers import OVERLAP
 
 
@@ -11,13 +11,13 @@ class Chunk:
         self.max_chunk_size = max_chunk_size
         self.overlap = int(max_chunk_size * OVERLAP)
 
-    def chunk_python(self, file: Path) -> list[MinimalSource]:
+    def chunk_python(self, file: Path) -> list[DataSource]:
 
         text = read_file(file)
         if text is None:
             return []
 
-        result: list[MinimalSource] = []
+        result: list[DataSource] = []
 
         splitter = RecursiveCharacterTextSplitter.from_language(
             language=Language.PYTHON,
@@ -38,8 +38,8 @@ class Chunk:
             result.append(model)
         return result
 
-    def chunk_manual(self, text: str, file: Path) -> list[MinimalSource]:
-        result: list[MinimalSource] = []
+    def chunk_manual(self, text: str, file: Path) -> list[DataSource]:
+        result: list[DataSource] = []
         start_index = 0
 
         while start_index < len(text):
@@ -59,12 +59,12 @@ class Chunk:
 
         return result
 
-    def chunk_markdown(self, file: Path) -> list[MinimalSource]:
+    def chunk_markdown(self, file: Path) -> list[DataSource]:
         text = read_file(file)
         if text is None:
             return []
 
-        result: list[MinimalSource] = []
+        result: list[DataSource] = []
 
         splitter = RecursiveCharacterTextSplitter.from_language(
             language=Language.MARKDOWN,
@@ -86,7 +86,7 @@ class Chunk:
             result.append(model)
         return result
 
-    def chunk_text(self, file: Path) -> list[MinimalSource]:
+    def chunk_text(self, file: Path) -> list[DataSource]:
 
         text = read_file(file)
         if text is None:
@@ -98,8 +98,8 @@ class Chunk:
         return result
 
     def build_model(self, path: Path, start: int, end: int,
-                    size: int, text: str) -> MinimalSource:
-        model = MinimalSource(
+                    size: int, text: str) -> DataSource:
+        model = DataSource(
             file_path=str(path),
             first_character_index=start,
             last_character_index=end,
