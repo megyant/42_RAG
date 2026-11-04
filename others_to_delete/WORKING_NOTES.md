@@ -521,14 +521,14 @@ TODOs.
       currently untracked and not ignored, so one `git add .` commits ~30 MB
 - [x] Rename `src/json.py` (shares the stdlib name) -> e.g. `storage.py`, and
       `load_json` -> `save_index`, since it writes. The real loader comes next
-- [ ] `Cli.search` still does the manual `int(k)` checks -- switch it to
+- [x] `Cli.search` still does the manual `int(k)` checks -- switch it to
       `SearchArgs`, with the same `try/except ValidationError` as `Cli.index`
 - [ ] Edge cases to test by hand once `search` uses `SearchArgs`:
       `search "   "` (whitespace-only query passes `min_length=1`),
       `search 123` (Fire passes an int, pydantic rejects it as "not a valid
       string"), `search hi --k` (Fire passes `True`; `strict=True` on `k`
       already rejects it)
-- [ ] Decide the chunk model: `MinimalSource` carries `size` + `content`,
+- [x] Decide the chunk model: `MinimalSource` carries `size` + `content`,
       `ChunkData` adds `text` (duplicate of `content`). Suggested: keep
       `MinimalSource` exactly as the subject defines it, put `content` on
       `ChunkData`, store `ChunkData` in the index, emit plain `MinimalSource`
@@ -537,10 +537,10 @@ TODOs.
 
 ### B. Finish persistence (Stage 3)
 
-- [ ] `load_index(processed_path) -> list[ChunkData]` next to `save_index`:
+- [x] `load_index(processed_path) -> list[ChunkData]` next to `save_index`:
       `model_validate_json`, catch `OSError` / `ValidationError`, and a missing
       file -> `CliError("No index found, run 'index' first")`
-- [ ] On load, assert no span exceeds 2000 (`last - first`) -- one oversized
+- [x] On load, assert no span exceeds 2000 (`last - first`) -- one oversized
       source invalidates the whole output for the moulinette
 
 ### C. Retrieval (Stage 4) -- the next real feature
@@ -550,9 +550,9 @@ TODOs.
       `make_tokenizer()` in `src/retrieval.py`
 - [x] BM25 with `bm25s`, built and saved in `index` to `data/processed/bm25/`
       (see "Retrieval with bm25s -- DECIDED")
-- [ ] Query side: `update_vocab=True` (problem 1) and the two bad-question
+- [x] Query side: `update_vocab=True` (problem 1) and the two bad-question
       checks (problem 2)
-- [ ] Load the index once per process, never per question (90 s / 200 q budget)
+- [x] Load the index once per process, never per question (90 s / 200 q budget)
 - [ ] `search <query> --k`: print ranked `file_path` + span
 - [ ] `search_dataset`: read `RagDataset`, one entry for **every** question,
       write `StudentSearchResults` to `<save_directory>/<dataset filename>`,
