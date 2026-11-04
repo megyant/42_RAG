@@ -32,7 +32,8 @@ extend-exclude = [
 [tool.mypy]
 exclude = [
     ".venv",
-    "vllm-*",
+    "data",
+    "moulinette_RAG",
     "others_to_delete",
     ".vscode",
     ".mypy_cache",

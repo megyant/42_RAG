@@ -4,6 +4,7 @@ from .ingesting import collect_files
 from .chunking import Chunk
 from .helpers import ParseError, PROCESSED_PATH
 from .create_data_results import save_index
+from .retrieval import create_indexable_data
 from tqdm import tqdm
 from pydantic import ValidationError
 import os
@@ -39,7 +40,7 @@ class Cli:
         chunk = Chunk(args.max_chunk_size)
         chunks: list[DataSource] = []
 
-        for path in tqdm(all_paths, desc="Indexing"):
+        for path in tqdm(all_paths, desc="Ingestion", leave=False):
             suffix = path.suffix.lower()
 
             if suffix == ".py":
@@ -52,10 +53,12 @@ class Cli:
                 chunks.extend(chunk.chunk_text(path))
 
         save_index(chunks=chunks)
+        create_indexable_data(chunks=chunks)
 
     def search(self, query: str, k: int = 10) -> None:
         try:
             args = SearchArgs(k=k, query=query)
+            print(args)
         except ValidationError as e:
             msgs = [f"'{err['loc'][0]}' - {err['msg']}" for err in e.errors()]
             raise ParseError("\n".join(msgs)) from None

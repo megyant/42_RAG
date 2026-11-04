@@ -393,6 +393,100 @@ assert original[first:last] == chunk.text          # round-trip
 methods and an untyped `chunk()` in `chunking/chunk.py`. Subject V.1 requires
 both to pass; V.2 makes `lint` mandatory.
 
+## Retrieval with bm25s -- DECIDED (2026-11-04)
+
+### What `index` does now
+
+`Cli.index` -> `save_index(chunks)` -> `create_indexable_data(chunks)`
+(`src/retrieval.py`). BM25 is built **once** in `index` and saved to
+`data/processed/bm25/`. `search` only loads it.
+
+- `make_tokenizer()` is the single definition of "text -> words". `index`
+  and `search` both call it, never two implementations
+- `code_splitter` keeps each identifier whole AND adds its parts:
+  `LLMEngine` -> `llmengine`, `llm`, `engine`;
+  `get_kv_cache_spec` -> whole word + `get`, `kv`, `cache`, `spec`
+- `lower=False` is required, otherwise bm25s lowercases before the splitter
+  sees the capitals
+- `texts` must be in the same order as `chunks`: BM25 returns **positions**,
+  and `chunks[pos]` turns a position back into file path + indices
+- Verified: LoRA dataset question -> `docs/features/lora.md [4695:6098]` first
+
+### The three `tokenize` arguments that matter
+
+| Argument | What it does | Where |
+|---|---|---|
+| `return_as="tuple"` | also returns the word list, so bm25s matches words by spelling. Without it `index` crashes on save with `Dict key must be str` | `index` and `search` |
+| `update_vocab=True` | adds new words on every call, not only the first | queries (`search`, `search_dataset`) |
+| `show_progress=False` | hides bm25s's own progress bar | optional |
+
+### Problem 1 -- reusing one tokenizer loses words
+
+The tokenizer only adds new words while its dictionary is **empty** (default
+`update_vocab="if_empty"`). Reusing it for a second question silently drops
+every word the first question didn't have:
+
+```
+"How do I load a LoRA adapter?"  -> words found
+"What is the kv cache spec?"     -> kv, cache, spec MISSING
+```
+
+**Fix:** `update_vocab=True` on the query side. One rule, works for 1 or 200
+questions. Safe because of `return_as="tuple"`: the query dictionary is
+temporary and never touches the saved index. `index` is fine as is (all chunks
+tokenized in one call into an empty dictionary).
+
+### Problem 2 -- bad questions (subject: "empty query, nonsensical query")
+
+Measured on the real index:
+
+| Question | Words left after tokenizing | Top scores |
+|---|---|---|
+| `"   "`, `"the"`, `"?!"` | none (only `""`) | 5.59, 5.59 -- **fake** |
+| `"zzzqqq"` | `zzzqqq` | 0.0, 0.0 |
+| `"how to load lora"` | `how`, `load`, `lora` | 4.91, 4.77 |
+
+No library needed: only the tokenizer and bm25s's output know what the index
+can use.
+
+- **Case A -- no real words** (only `""` in the tuple's `vocab`): the 5.59
+  results come from chunks that also contain the empty word. They look real
+  but are not. -> **warn, return an empty list of sources**
+- **Case B -- real words, top score 0**: nothing in the corpus matches.
+  -> **warn, still return the k results**
+
+Decided: always answer, warn the user. In `search_dataset` the question still
+gets its entry (empty sources in case A), so the output file keeps its shape.
+Don't print 200 warnings -- count them and print one line at the end.
+
+Flow per question:
+
+```
+1. tokenize the question
+2. only "" left?      -> warn, no sources
+3. retrieve
+4. top score == 0?    -> warn, return results anyway
+```
+
+Open: which file holds these checks so `search` and `search_dataset` share
+them without copying.
+
+### Still to fix (from the 2026-11-04 review)
+
+- `cli.py`: `print(args)` in `search` is debug code
+- `search` checks `data/processed/` exists; it should check
+  `data/processed/bm25/` (and `chunks.json`), and the message should say
+  `python -m src index`
+- `retrieval.py`: the `try` wraps tokenize + build too; only `retriever.save`
+  raises `OSError`
+- mypy: `bm25s`, `tqdm`, `fire` have no type info -- install stubs or ignore
+  those modules in `pyproject.toml`
+- Subject: "All input and output paths must be configurable CLI arguments and
+  never hard-coded" -- `create_indexable_data` always writes to
+  `PROCESSED_PATH`
+- tqdm is required for long-running operations; bm25s's bars are tqdm, or use
+  your own step bar with `show_progress=False`
+
 ## Makefile notes
 
 - Quotes around `ARGS` on the *variable definition* break it -- make passes one
@@ -451,10 +545,13 @@ TODOs.
 
 ### C. Retrieval (Stage 4) -- the next real feature
 
-- [ ] Tokenizer shared by index and query; split `snake_case` / `CamelCase` AND
-      keep the whole identifier (70/99 code questions quote identifiers)
-- [ ] BM25 (own implementation or `rank_bm25`) built from `content` right after
-      loading; only persist tokens/stats if load time turns out to matter
+- [x] Tokenizer shared by index and query; split `snake_case` / `CamelCase` AND
+      keep the whole identifier (70/99 code questions quote identifiers) --
+      `make_tokenizer()` in `src/retrieval.py`
+- [x] BM25 with `bm25s`, built and saved in `index` to `data/processed/bm25/`
+      (see "Retrieval with bm25s -- DECIDED")
+- [ ] Query side: `update_vocab=True` (problem 1) and the two bad-question
+      checks (problem 2)
 - [ ] Load the index once per process, never per question (90 s / 200 q budget)
 - [ ] `search <query> --k`: print ranked `file_path` + span
 - [ ] `search_dataset`: read `RagDataset`, one entry for **every** question,

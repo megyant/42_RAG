@@ -11,7 +11,7 @@ class MinimalSource(BaseModel):
 
 class DataSource(MinimalSource):
     size: int = Field(exclude=True)
-    content: str = Field(exclude=True)
+    content: str
 
 
 class UnansweredQuestion(BaseModel):

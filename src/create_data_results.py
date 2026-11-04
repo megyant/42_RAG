@@ -29,6 +29,6 @@ def save_index(chunks: list[DataSource],
     except OSError as e:
         raise CliError(f"Could not write index: {e.strerror}")
 
-    print(f"\n{Colors.BOLD}{Colors.GREEN}Success:{Colors.END} Ingestion "
+    print(f"{Colors.BOLD}{Colors.GREEN}Success:{Colors.END} Ingestion "
           "complete. Saved under "
-          f"'{output_dir}'.\n")
+          f"'{output_dir}'.")
