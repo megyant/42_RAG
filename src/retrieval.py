@@ -1,6 +1,6 @@
 import bm25s
 from .models import DataSource
-from .helpers import PROCESSED_PATH, Colors, CliError
+from .helpers import PROCESSED_PATH, Colors, CliError, BM25_FOLDER
 import os
 import re
 
@@ -34,7 +34,7 @@ def create_indexable_data(chunks: list[DataSource]) -> None:
 
     retriever = bm25s.BM25()
     retriever.index(tokens)
-    output_dir = os.path.join(PROCESSED_PATH, "bm25")
+    output_dir = os.path.join(PROCESSED_PATH, BM25_FOLDER)
 
     try:
         retriever.save(output_dir)

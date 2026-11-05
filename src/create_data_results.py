@@ -1,7 +1,8 @@
 from pydantic import BaseModel, ValidationError
 from .models import DataSource
-from .helpers import CliError, PROCESSED_PATH, Colors
+from .helpers import (CliError, PROCESSED_PATH, Colors, CHUNK_FILE)
 from pathlib import Path
+import os
 
 
 class ChunkIndex(BaseModel):
@@ -21,9 +22,9 @@ def save_index(chunks: list[DataSource],
     try:
         output_dir.mkdir(parents=True, exist_ok=True)
 
-        file_name = "chunks.json"
+        output_dir = os.path.join(PROCESSED_PATH, CHUNK_FILE)
 
-        with open(output_dir / file_name, "w",
+        with open(output_dir, "w",
                   encoding="utf-8") as f:
             f.write(data.model_dump_json(indent=4))
     except OSError as e:

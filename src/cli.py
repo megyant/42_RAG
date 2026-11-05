@@ -2,12 +2,14 @@ from .parser.parse_values import IndexArgs, SearchArgs
 from .models import DataSource
 from .ingesting import collect_files
 from .chunking import Chunk
-from .helpers import ParseError, PROCESSED_PATH
+from .helpers import ParseError, PROCESSED_PATH, BM25_FOLDER, CHUNK_FILE
 from .create_data_results import save_index
 from .retrieval import create_indexable_data
 from tqdm import tqdm
 from pydantic import ValidationError
 import os
+import bm25s
+import json
 
 """
 index –max_chunk_size <int>
@@ -59,6 +61,18 @@ class Cli:
         try:
             args = SearchArgs(k=k, query=query)
             print(args)
+
+            output_dir_bm25 = os.path.join(PROCESSED_PATH, BM25_FOLDER)
+
+            retriever = bm25s.BM25.load(output_dir_bm25)
+
+            output_dir_chunks = os.path.join(PROCESSED_PATH, CHUNK_FILE)
+
+            with open(output_dir_chunks, 'r') as f:
+                chunks = json.load(f)
+
+            print(len(chunks["chunks"]) == retriever.scores["num_docs"])
+
         except ValidationError as e:
             msgs = [f"'{err['loc'][0]}' - {err['msg']}" for err in e.errors()]
             raise ParseError("\n".join(msgs)) from None
