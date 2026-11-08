@@ -2,7 +2,7 @@ from .parser.parse_values import IndexArgs, SearchArgs
 from .models import DataSource
 from .ingesting import collect_files
 from .chunking import Chunk
-from .helpers import ParseError, PROCESSED_PATH
+from .helpers import ParseError, PROCESSED_PATH, Colors
 from .create_data_results import save_index
 from .retrieval import create_indexable_data, retrieve_sources
 from tqdm import tqdm
@@ -58,12 +58,15 @@ class Cli:
     def search(self, query: str, k: int = 10) -> None:
         try:
             args = SearchArgs(k=k, query=query)
-
-            retrieve_sources(args.query, args.k)
-
         except ValidationError as e:
             msgs = [f"'{err['loc'][0]}' - {err['msg']}" for err in e.errors()]
             raise ParseError("\n".join(msgs)) from None
+
+        sources = retrieve_sources(args.query, args.k)
+
+        for i, source in enumerate(sources, 1):
+            print(f"{Colors.BOLD}{Colors.BLUE}Result {i}:{Colors.END} "
+                  f"{source}")
 
         if os.path.exists(PROCESSED_PATH) is False:
             raise ParseError("Index not found, "

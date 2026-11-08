@@ -691,3 +691,33 @@ The two bracketing tests:
 | IDF variant | Stage 4 | Lucene `+1` (safer) vs Robertson (goes negative on code) |
 | `b` and `k1` | Stage 4 | sweep; chunks vary ~40x in length so `b` will move recall |
 | Retrieval `k` vs generation `k` | Stage 6 | same `k`, or wide retrieval + narrow context |
+
+
+
+Almost. The idea is right, but there's one trap in reusing it exactly as it is. I measured retrieve_sources in its two parts on your index:
+
+loading the index + chunks.json   0.37 s
+searching one question            0.003 s
+
+Right now retrieve_sources does both every time it's called. If search_dataset calls it once per question:
+
+200 questions × 0.37 s ≈ 74 s of loading     (the subject's limit: 90 s)
+200 questions × 0.003 s ≈ 0.6 s of searching
+
+That's 99% of the time spent reloading the same files 200 times. It might still pass, but only just, and the private dataset or a slower school computer could push it over. Your working notes already say it: "Load the index once per process, never per question."
+
+The "minor change"
+
+Split the loading from the searching:
+
+1. A load function opens the index and chunks.json and runs the num_docs check. It returns the retriever and the chunk list. This is the top half of your current retrieve_sources.
+2. retrieve_sources receives the retriever and the chunk list as parameters, instead of loading them. Everything from make_tokenizer() onwards stays as it is.
+
+Then:
+
+- search calls load once and retrieve_sources once.
+- search_dataset calls load once, then loops retrieve_sources over the questions with tqdm.
+
+The loop in search_dataset also builds a MinimalSearchResults for each question: its question_id, its question, and what retrieve_sources returned. After the loop it wraps them in a StudentSearchResults with k and saves the file.
+
+One design question: the tokenizer is cheap to create, but should retrieve_sources still create a new one on every call? update_vocab=True makes reusing one safe, but there are arguments both ways.

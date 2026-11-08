@@ -1,5 +1,5 @@
 import bm25s
-from .models import DataSource
+from .models import DataSource, MinimalSource
 from .helpers import (PROCESSED_PATH, Colors, RetrievalError, BM25_FOLDER,
                       CHUNK_FILE)
 import os
@@ -48,7 +48,7 @@ def create_indexable_data(chunks: list[DataSource]) -> None:
           f"'{output_dir}'.")
 
 
-def retrieve_sources(query: str, k: int):
+def retrieve_sources(query: str, k: int) -> list[MinimalSource]:
     output_dir_bm25 = os.path.join(PROCESSED_PATH, BM25_FOLDER)
     output_dir_chunks = os.path.join(PROCESSED_PATH, CHUNK_FILE)
 
@@ -61,7 +61,9 @@ def retrieve_sources(query: str, k: int):
     except OSError as e:
         raise RetrievalError(f"Index not found: {e.strerror}")
 
-    if (len(chunks) == retriever.scores["num_docs"]) is False:
+    chunk_list = chunks["chunks"]
+
+    if len(chunk_list) != retriever.scores["num_docs"]:
         raise RetrievalError("Number of chunks and number of "
                              "retrieved indexes do not match")
 
@@ -71,9 +73,27 @@ def retrieve_sources(query: str, k: int):
                                       return_as="tuple",
                                       update_vocab=True)
 
-    positions, scores = retriever.retrieve(query_tokens=query_tokens,
-                                           corpus=corpus,
-                                           k=k)
+    if not isinstance(query_tokens, bm25s.tokenization.Tokenized):
+        raise RetrievalError("Tokenizer returned an unexpected type")
 
-    if scores[0][0] == 0:
-        print("Warning: empty score")
+    has_words = any(word != "" for word in query_tokens.vocab)
+    if not has_words:
+        print(f"{Colors.BOLD}{Colors.YELLOW}Warning:{Colors.END} the question "
+              "has no searchable words")
+        return []
+
+    documents, scores = retriever.retrieve(query_tokens=query_tokens,
+                                           corpus=chunk_list,
+                                           k=k)
+    has_score = any(score != 0. for score in scores[0])
+    if not has_score:
+        print(f"{Colors.BOLD}{Colors.YELLOW}Warning:{Colors.END} No "
+              "chunk matches this question")
+        return []
+
+    return build_sources(documents[0])
+
+
+def build_sources(documents_row: list) -> list[MinimalSource]:
+    return [MinimalSource.model_validate(chunk) for
+            chunk in documents_row]

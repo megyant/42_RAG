@@ -40,10 +40,11 @@ exclude = [
     "__pycache__"
 ]
 
-[tool.mypy.overrides]
+[[tool.mypy.overrides]]
 module = [
     "bm25s",
     "bm25s.*",
     "fire",
     "tqdm"
 ]
+ignore_missing_imports = true

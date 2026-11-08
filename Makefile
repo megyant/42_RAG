@@ -10,6 +10,8 @@ MYPY_FLAGS = --warn-return-any --warn-unused-ignores \
 
 ARGS = index --max_chunk_size 2000
 
+all: install run
+
 install:
 	@if ! command -v uv >/dev/null 2>&1; then \
 		echo "Installing uv..."; \
