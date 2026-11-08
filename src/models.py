@@ -46,7 +46,3 @@ class StudentSearchResults(BaseModel):
 class StudentSearchResultsAndAnswer(BaseModel):
     search_results: List[MinimalAnswer]
     k: int
-
-
-class ChunkData(MinimalSource):
-    text: str

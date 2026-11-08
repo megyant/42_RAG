@@ -1,4 +1,4 @@
-from .models import (ChunkData, MinimalAnswer, MinimalSearchResults,
+from .models import (MinimalAnswer, MinimalSearchResults,
                      MinimalSource, StudentSearchResults,
                      StudentSearchResultsAndAnswer,
                      UnansweredQuestion,
@@ -6,7 +6,7 @@ from .models import (ChunkData, MinimalAnswer, MinimalSearchResults,
 from .cli import Cli
 
 
-__all__ = ["ChunkData", "MinimalAnswer", "MinimalSearchResults",
+__all__ = ["MinimalAnswer", "MinimalSearchResults",
            "MinimalSource", "StudentSearchResults",
            "StudentSearchResultsAndAnswer", "UnansweredQuestion",
            "AnsweredQuestion", "RagDataset", "Cli"]

@@ -39,3 +39,11 @@ exclude = [
     ".mypy_cache",
     "__pycache__"
 ]
+
+[tool.mypy.overrides]
+module = [
+    "bm25s",
+    "bm25s.*",
+    "fire",
+    "tqdm"
+]
