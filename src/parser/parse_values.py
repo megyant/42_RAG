@@ -13,3 +13,9 @@ class IndexArgs(CliArgs):
 class SearchArgs(CliArgs):
     query: str = Field(min_length=1)
     k: int = Field(10, ge=1, strict=True)
+
+
+class SearchDataArgs(CliArgs):
+    dataset_path: str
+    save_directory: str
+    k: int = Field(10, ge=1, strict=True)

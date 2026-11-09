@@ -9,6 +9,10 @@ MYPY_FLAGS = --warn-return-any --warn-unused-ignores \
              --check-untyped-defs
 
 ARGS = index --max_chunk_size 2000
+DATASET_PATH_CODE = "data/datasets/UnansweredQuestions/dataset_code_public.json"
+DATASET_PATH_DOCS = "data/datasets/UnansweredQuestions/dataset_docs_public.json"
+SAVE_DIRECTORY = "data/output/search_results/UnansweredQuestions"
+
 
 all: install run
 

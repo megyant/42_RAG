@@ -5,6 +5,7 @@ from .helpers import (PROCESSED_PATH, Colors, RetrievalError, BM25_FOLDER,
 import os
 import re
 import json
+from typing import Any
 
 WORD = re.compile(r"\w+")
 PARTS = re.compile(r"[A-Z]+(?=[A-Z][a-z])|[A-Z]?[a-z]+|[A-Z]+|\d+")
@@ -48,7 +49,7 @@ def create_indexable_data(chunks: list[DataSource]) -> None:
           f"'{output_dir}'.")
 
 
-def retrieve_sources(query: str, k: int) -> list[MinimalSource]:
+def load_index() -> tuple[Any, list[dict[str, Any]]]:
     output_dir_bm25 = os.path.join(PROCESSED_PATH, BM25_FOLDER)
     output_dir_chunks = os.path.join(PROCESSED_PATH, CHUNK_FILE)
 
@@ -58,14 +59,25 @@ def retrieve_sources(query: str, k: int) -> list[MinimalSource]:
         with open(output_dir_chunks, 'r', encoding="utf-8") as f:
             chunks = json.load(f)
 
-    except OSError as e:
-        raise RetrievalError(f"Index not found: {e.strerror}")
+        chunk_list = chunks["chunks"]
 
-    chunk_list = chunks["chunks"]
+    except OSError as e:
+        raise RetrievalError(f"Index not found: {e.strerror}. "
+                             "Run 'python -m src index'")
+    except (json.JSONDecodeError, KeyError):
+        raise RetrievalError(f"'{output_dir_chunks}' is corrupted. "
+                             "Run 'python -m src index' again")
 
     if len(chunk_list) != retriever.scores["num_docs"]:
         raise RetrievalError("Number of chunks and number of "
                              "retrieved indexes do not match")
+
+    return retriever, chunk_list
+
+
+def retrieve_sources(query: str, k: int,
+                     retriever: Any,
+                     chunk_list: list[dict[str, Any]]) -> list[MinimalSource]:
 
     tokenizer = make_tokenizer()
 
