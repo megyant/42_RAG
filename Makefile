@@ -51,6 +51,7 @@ debug: install
 
 clean:
 	rm -rf data/processed
+	rm -rf data/output
 	find . -type d -name "__pycache__" -exec rm -rf {} +
 	rm -rf .mypy_cache
 

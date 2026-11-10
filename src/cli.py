@@ -1,12 +1,15 @@
-from .parser.parse_values import IndexArgs, SearchArgs, SearchDataArgs
-from .models import DataSource
+from .parser.parse_values import (IndexArgs, SearchArgs, SearchDataArgs,
+                                  AnswerArgs, AnswerDataArgs)
+from .models import DataSource, MinimalSearchResults
 from .ingesting import collect_files, load_questions
 from .chunking import Chunk
-from .helpers import ParseError, Colors
-from .create_data_results import save_index
-from .retrieval import create_indexable_data, retrieve_sources, load_index
+from .helpers import ParseError, Colors, WORD_ERROR, CHUNK_ERROR
+from .create_data_results import save_index, save_search_results
+from .retrieval import (create_indexable_data, retrieve_sources,
+                        prepare_retrieval)
 from tqdm import tqdm
 from pydantic import ValidationError
+from pathlib import Path
 
 """
 index –max_chunk_size <int>
@@ -61,15 +64,18 @@ class Cli:
             msgs = [f"'{err['loc'][0]}' - {err['msg']}" for err in e.errors()]
             raise ParseError("\n".join(msgs)) from None
 
-        retriever, chunk_list = load_index()
+        retriever, chunk_list = prepare_retrieval(args.k)
 
-        if args.k > len(chunk_list):
-            raise ParseError(f"k={k} is larger than the {len(chunk_list)} "
-                             "chunks in the index")
+        sources, warning = retrieve_sources(args.query, args.k, retriever,
+                                            chunk_list)
+        if warning == WORD_ERROR:
+            print(f"{Colors.BOLD}{Colors.YELLOW}Warning:{Colors.END} "
+                  "The question has no searchable words")
+        elif warning == CHUNK_ERROR:
+            print(f"{Colors.BOLD}{Colors.YELLOW}Warning:{Colors.END} No "
+                  "chunk matches this question")
 
-        sources = retrieve_sources(args.query, args.k, retriever, chunk_list)
-
-        for i, source in enumerate(sources, 1):
+        for i, source in enumerate(sources, start=1):
             print(f"{Colors.BOLD}{Colors.BLUE}Result {i}:{Colors.END} "
                   f"{source}")
 
@@ -83,25 +89,82 @@ class Cli:
             msgs = [f"'{err['loc'][0]}' - {err['msg']}" for err in e.errors()]
             raise ParseError("\n".join(msgs)) from None
 
-        retriever, chunk_list = load_index()
+        word = 0
+        chunk = 0
 
-        if args.k > len(chunk_list):
-            raise ParseError(f"k={k} is larger than the {len(chunk_list)} "
-                             "chunks in the index")
+        retriever, chunk_list = prepare_retrieval(args.k)
 
         questions = load_questions(args.dataset_path)
+        search_results: list[MinimalSearchResults] = []
 
-        for question in tqdm(questions,
+        for question in tqdm(questions["rag_questions"],
                              desc="Searching Datasets",
                              leave=False):
-            print(question)
+            sources, warnings = retrieve_sources(question["question"],
+                                                 args.k,
+                                                 retriever,
+                                                 chunk_list)
+            if warnings == WORD_ERROR:
+                word += 1
+            elif warnings == CHUNK_ERROR:
+                chunk += 1
 
-    def answer(self, query: str, k: int) -> None:
-        ...
+            model = MinimalSearchResults(question_id=question
+                                         ["question_id"],
+                                         question=question["question"],
+                                         retrieved_sources=sources)
+            search_results.append(model)
+
+        if word != 0:
+            if word == 1:
+                print(f"{Colors.BOLD}{Colors.YELLOW}Warning:{Colors.END} "
+                      f"{word} question has no searchable words")
+            else:
+                print(f"{Colors.BOLD}{Colors.YELLOW}Warning:{Colors.END} "
+                      f"{word} questions have no searchable words")
+        if chunk != 0:
+            if chunk == 1:
+                print(f"{Colors.BOLD}{Colors.YELLOW}Warning:{Colors.END} "
+                      f"{chunk} question has no matching chunks")
+            else:
+                print(f"{Colors.BOLD}{Colors.YELLOW}Warning:{Colors.END} "
+                      f"{chunk} questions have no matching chunks")
+
+        filename = Path(args.dataset_path).name
+
+        save_search_results(search_results=search_results,
+                            output_path=args.save_directory,
+                            k=args.k,
+                            filename=filename)
+
+    def answer(self, query: str, k: int = 10) -> None:
+        try:
+            args = AnswerArgs(query=query, k=k)
+        except ValidationError as e:
+            msgs = [f"'{err['loc'][0]}' - {err['msg']}" for err in e.errors()]
+            raise ParseError("\n".join(msgs)) from None
+
+        retriever, chunk_list = prepare_retrieval(args.k)
+
+        sources, warning = retrieve_sources(args.query, args.k, retriever,
+                                            chunk_list)
+        if warning == WORD_ERROR:
+            print(f"{Colors.BOLD}{Colors.YELLOW}Warning:{Colors.END} "
+                  "The question has no searchable words")
+        elif warning == CHUNK_ERROR:
+            print(f"{Colors.BOLD}{Colors.YELLOW}Warning:{Colors.END} No "
+                  "chunk matches this question")
 
     def answer_dataset(self, student_search_results_path: str,
                        save_directory: str) -> None:
-        ...
+        try:
+            args = AnswerDataArgs(
+                student_search_results_path=student_search_results_path,
+                save_directory=save_directory)
+            print(args)
+        except ValidationError as e:
+            msgs = [f"'{err['loc'][0]}' - {err['msg']}" for err in e.errors()]
+            raise ParseError("\n".join(msgs)) from None
 
     def evaluate(self, student_search_results_path: str,
                  dataset_path: str) -> None:
@@ -110,10 +173,12 @@ class Cli:
 
 """
 #TODO
-- Call retrieve_sources in the loop
-- Build MinimalSearchResults per question
-- Build a StudentSeachResults around the list
-- Save to the save_directory/nameofdataset.json
+Starting on Answer
+- Load index + retrieve sources (reuse)
+- Read each source's text from its file
+- Load Qwen and its tokenizer once
+- generate_answer(question, texts) -> str
+- Cli.answer prints a MinimalAnswer
 
 
 - Answer, answer_dataset, evaluate, README

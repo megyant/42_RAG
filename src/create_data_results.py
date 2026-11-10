@@ -1,7 +1,7 @@
 from pydantic import BaseModel, ValidationError
-from .models import DataSource
+from .models import DataSource, MinimalSearchResults, StudentSearchResults
 from .helpers import (PROCESSED_PATH, Colors, CHUNK_FILE,
-                      IndexingError)
+                      IndexingError, RetrievalError)
 from pathlib import Path
 import os
 
@@ -23,7 +23,7 @@ def save_index(chunks: list[DataSource],
     try:
         output_dir.mkdir(parents=True, exist_ok=True)
 
-        path = os.path.join(PROCESSED_PATH, CHUNK_FILE)
+        path = os.path.join(output_dir, CHUNK_FILE)
 
         with open(path, "w",
                   encoding="utf-8") as f:
@@ -32,5 +32,34 @@ def save_index(chunks: list[DataSource],
         raise IndexingError(f"Could not write index: {e.strerror}")
 
     print(f"{Colors.BOLD}{Colors.GREEN}Success:{Colors.END} Ingestion "
+          "complete. Saved under "
+          f"'{output_dir}'.")
+
+
+def save_search_results(search_results: list[MinimalSearchResults],
+                        output_path: str,
+                        k: int,
+                        filename: str) -> None:
+
+    output_dir = Path(output_path)
+
+    try:
+        data = StudentSearchResults(search_results=search_results, k=k)
+    except ValidationError as e:
+        raise RetrievalError("Could not write search results: "
+                             f"{e.errors()[0]['type']}")
+
+    try:
+        output_dir.mkdir(parents=True, exist_ok=True)
+
+        path = os.path.join(output_dir, filename)
+
+        with open(path, "w",
+                  encoding="utf-8") as f:
+            f.write(data.model_dump_json(indent=4))
+    except OSError as e:
+        raise RetrievalError(f"Could not write results: {e.strerror}")
+
+    print(f"{Colors.BOLD}{Colors.GREEN}Success:{Colors.END} Search "
           "complete. Saved under "
           f"'{output_dir}'.")

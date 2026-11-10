@@ -2,6 +2,7 @@ from pathlib import Path
 from src.helpers import RAW_PATH, ParseError
 import re
 import json
+from typing import Any
 
 
 def collect_files(raw_path: str = RAW_PATH) -> list[Path]:
@@ -35,7 +36,7 @@ def split_endings(text: str) -> list[str]:
     return re.findall("[^\r\n]*(?:\r\n|\r|\n)|[^\r\n]+$", text)
 
 
-def load_questions(path: str):
+def load_questions(path: str) -> Any:
     try:
         with open(path, encoding="utf-8") as f:
             questions = json.load(f)

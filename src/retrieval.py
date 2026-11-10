@@ -1,7 +1,7 @@
 import bm25s
 from .models import DataSource, MinimalSource
 from .helpers import (PROCESSED_PATH, Colors, RetrievalError, BM25_FOLDER,
-                      CHUNK_FILE)
+                      CHUNK_FILE, WORD_ERROR, CHUNK_ERROR, ParseError)
 import os
 import re
 import json
@@ -75,9 +75,21 @@ def load_index() -> tuple[Any, list[dict[str, Any]]]:
     return retriever, chunk_list
 
 
+def prepare_retrieval(k: int) -> tuple[Any, list[dict[str, Any]]]:
+    retriever, chunk_list = load_index()
+
+    if k > len(chunk_list):
+        raise ParseError(f"k={k} is larger than the "
+                         f"{len(chunk_list)} "
+                         "chunks in the index")
+
+    return retriever, chunk_list
+
+
 def retrieve_sources(query: str, k: int,
                      retriever: Any,
-                     chunk_list: list[dict[str, Any]]) -> list[MinimalSource]:
+                     chunk_list: list[dict[str, Any]]) -> \
+                         tuple[list[MinimalSource], str | None]:
 
     tokenizer = make_tokenizer()
 
@@ -90,20 +102,16 @@ def retrieve_sources(query: str, k: int,
 
     has_words = any(word != "" for word in query_tokens.vocab)
     if not has_words:
-        print(f"{Colors.BOLD}{Colors.YELLOW}Warning:{Colors.END} the question "
-              "has no searchable words")
-        return []
+        return [], WORD_ERROR
 
     documents, scores = retriever.retrieve(query_tokens=query_tokens,
                                            corpus=chunk_list,
                                            k=k)
     has_score = any(score != 0. for score in scores[0])
     if not has_score:
-        print(f"{Colors.BOLD}{Colors.YELLOW}Warning:{Colors.END} No "
-              "chunk matches this question")
-        return []
+        return [], CHUNK_ERROR
 
-    return build_sources(documents[0])
+    return build_sources(documents[0]), None
 
 
 def build_sources(documents_row: list) -> list[MinimalSource]:
