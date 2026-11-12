@@ -7,6 +7,7 @@ from .helpers import ParseError, Colors, WORD_ERROR, CHUNK_ERROR
 from .create_data_results import save_index, save_search_results
 from .retrieval import (create_indexable_data, retrieve_sources,
                         prepare_retrieval)
+from .generation import read_sources, LLM
 from tqdm import tqdm
 from pydantic import ValidationError
 from pathlib import Path
@@ -57,7 +58,7 @@ class Cli:
         save_index(chunks=chunks)
         create_indexable_data(chunks=chunks)
 
-    def search(self, query: str, k: int = 10) -> None:
+    def search(self, query: str, k: int = 5) -> None:
         try:
             args = SearchArgs(k=k, query=query)
         except ValidationError as e:
@@ -80,7 +81,7 @@ class Cli:
                   f"{source}")
 
     def search_dataset(self, dataset_path: str, save_directory: str,
-                       k: int = 10) -> None:
+                       k: int = 5) -> None:
         try:
             args = SearchDataArgs(dataset_path=dataset_path,
                                   save_directory=save_directory,
@@ -137,7 +138,7 @@ class Cli:
                             k=args.k,
                             filename=filename)
 
-    def answer(self, query: str, k: int = 10) -> None:
+    def answer(self, query: str, k: int = 5) -> None:
         try:
             args = AnswerArgs(query=query, k=k)
         except ValidationError as e:
@@ -146,14 +147,24 @@ class Cli:
 
         retriever, chunk_list = prepare_retrieval(args.k)
 
-        sources, warning = retrieve_sources(args.query, args.k, retriever,
-                                            chunk_list)
+        source, warning = retrieve_sources(args.query, args.k, retriever,
+                                           chunk_list)
         if warning == WORD_ERROR:
             print(f"{Colors.BOLD}{Colors.YELLOW}Warning:{Colors.END} "
                   "The question has no searchable words")
+            return
         elif warning == CHUNK_ERROR:
             print(f"{Colors.BOLD}{Colors.YELLOW}Warning:{Colors.END} No "
                   "chunk matches this question")
+            return
+        texts = read_sources(sources=source)
+
+        print(f"\n{Colors.BOLD}{Colors.BLUE}Calling the LLM...{Colors.END}")
+        model = LLM()
+        print(f"\n{Colors.BOLD}{Colors.BLUE}Processing the prompt..."
+              f"{Colors.END}")
+        response = model.generate_response(args.query, source, texts)
+        print(f"\n{Colors.BOLD}{Colors.GREEN}Response: {Colors.END}{response}")
 
     def answer_dataset(self, student_search_results_path: str,
                        save_directory: str) -> None:
@@ -161,7 +172,7 @@ class Cli:
             args = AnswerDataArgs(
                 student_search_results_path=student_search_results_path,
                 save_directory=save_directory)
-            print(args)
+            
         except ValidationError as e:
             msgs = [f"'{err['loc'][0]}' - {err['msg']}" for err in e.errors()]
             raise ParseError("\n".join(msgs)) from None

@@ -16,7 +16,9 @@ dependencies = [
     "langchain-text-splitters",
     "tqdm",
     "bm25s",
-    "PyStemmer"
+    "PyStemmer",
+    "transformers",
+    "torch"
 ]
 
 [tool.flake8]
@@ -45,6 +47,7 @@ module = [
     "bm25s",
     "bm25s.*",
     "fire",
-    "tqdm"
+    "tqdm",
+    "transformers"
 ]
 ignore_missing_imports = true
