@@ -721,3 +721,40 @@ Then:
 The loop in search_dataset also builds a MinimalSearchResults for each question: its question_id, its question, and what retrieve_sources returned. After the loop it wraps them in a StudentSearchResults with k and saves the file.
 
 One design question: the tokenizer is cheap to create, but should retrieve_sources still create a new one on every call? update_vocab=True makes reusing one safe, but there are arguments both ways.
+
+
+
+
+Here's the plan for answer_dataset, in words. You already have every building block.
+
+The key difference from answer
+
+answer_dataset does no search. Its input is the JSON file that search_dataset already wrote (a StudentSearchResults), so every question already comes with its retrieved_sources. So:
+
+- no prepare_retrieval;
+- no retrieve_sources;
+- no bm25s at all.
+
+The steps, in order
+
+1. Validate the arguments. You already have this with AnswerDataArgs. While you're there, remove the debugging print(args) on line 175.
+2. Load the input file into the model. Read the JSON at student_search_results_path and turn it into a StudentSearchResults with model_validate, the same pydantic method you used in build_sources. You get two things for free:
+   - a check: a malformed file raises an error you can turn into a clean message;
+   - real objects: each entry is already a MinimalSearchResults holding real MinimalSource objects, ready for read_sources.
+
+   Remember k from that file too, because the output needs it.
+3. Load the LLM once, before the loop. Creating LLM() takes several seconds. Inside the loop, that would cost 100 × that.
+4. Loop over search_results with tqdm. For each entry:
+   - read_sources(entry.retrieved_sources) gives you the texts;
+   - llm.generate_response(entry.question, entry.retrieved_sources, texts) gives you the answer string;
+   - build a MinimalAnswer from the entry's three fields plus answer, and append it to a list.
+5. Wrap up and save. Put the list and k into a StudentSearchResultsAndAnswer, then write it to save_directory, using the same file name as the input file. That's what the subject's walkthrough shows, and you already get the name with Path(...).name in search_dataset.
+
+Two decisions for you
+
+1. Empty sources. Some entries were saved with retrieved_sources empty, after a WORD_ERROR or CHUNK_ERROR in search_dataset. Should you still call the LLM for those? What answer should go in the file? The entry must still be written either way, so the question count stays the same.
+2. Saving. save_search_results writes a StudentSearchResults. Would you make it more general, so it can save either model, or write a second save function? Look at what it actually does with its arguments before you decide.
+
+A heads-up on time
+
+At about 15 to 25 s per answer on CPU, 100 questions take 30 to 40 minutes. While you develop, test on a small file: copy the search results JSON and keep only 3 questions.
