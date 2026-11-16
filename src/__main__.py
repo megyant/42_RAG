@@ -1,11 +1,11 @@
 import fire
 import sys
 from .helpers import Colors, CliError
-from .cli import Cli
 
 
 def main() -> None:
     try:
+        from .cli import Cli
         fire.Fire(Cli)
 
     except CliError as e:

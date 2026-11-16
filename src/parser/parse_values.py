@@ -29,3 +29,8 @@ class AnswerArgs(CliArgs):
 class AnswerDataArgs(CliArgs):
     student_search_results_path: str
     save_directory: str
+
+
+class EvaluateArgs(CliArgs):
+    student_search_results_path: str
+    dataset_path: str

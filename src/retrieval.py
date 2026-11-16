@@ -114,6 +114,6 @@ def retrieve_sources(query: str, k: int,
     return build_sources(documents[0]), None
 
 
-def build_sources(documents_row: list) -> list[MinimalSource]:
+def build_sources(documents_row: list[Any]) -> list[MinimalSource]:
     return [MinimalSource.model_validate(chunk) for
             chunk in documents_row]

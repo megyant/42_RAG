@@ -1,5 +1,5 @@
 from .parser.parse_values import (IndexArgs, SearchArgs, SearchDataArgs,
-                                  AnswerArgs, AnswerDataArgs)
+                                  AnswerArgs, AnswerDataArgs, EvaluateArgs)
 from .models import DataSource, MinimalSearchResults, MinimalAnswer
 from .ingesting import collect_files, load_questions
 from .chunking import Chunk
@@ -209,7 +209,13 @@ class Cli:
 
     def evaluate(self, student_search_results_path: str,
                  dataset_path: str) -> None:
-        ...
+        try:
+            args = EvaluateArgs(
+                student_search_results_path=student_search_results_path,
+                dataset_path=dataset_path)
+        except ValidationError as e:
+            msgs = [f"'{err['loc'][0]}' - {err['msg']}" for err in e.errors()]
+            raise ParseError("\n".join(msgs)) from None
 
 
 """

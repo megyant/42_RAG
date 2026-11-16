@@ -3,8 +3,7 @@ from .models import MinimalSource, StudentSearchResults
 from .helpers import SYSTEM_PROMPT, MAX_CONTEXT, MAX_NEW_TOKENS, ParseError
 from pathlib import Path
 import json
-from transformers import AutoModelForCausalLM, AutoTokenizer
-import torch
+from pydantic import ValidationError
 from typing import Any
 
 
@@ -37,7 +36,7 @@ def load_student_search_results(
                   encoding="utf-8", newline="")as f:
             searches = json.load(f)
 
-        search_results = StudentSearchResults(searches)
+        search_results = StudentSearchResults.model_validate(searches)
 
         return search_results
     except OSError:
@@ -47,10 +46,15 @@ def load_student_search_results(
     except json.JSONDecodeError:
         raise ParseError(f"File '{student_search_results_path}' "
                          "could not be processed.")
+    except ValidationError:
+        raise ParseError(f"File '{student_search_results_path}' "
+                         "is not a valid search results file.")
 
 
 class LLM:
     def __init__(self, model_name: str = "Qwen/Qwen3-0.6B"):
+        from transformers import AutoModelForCausalLM, AutoTokenizer
+        import torch
         self.tokenizer = AutoTokenizer.from_pretrained(model_name)
         self.model: Any = AutoModelForCausalLM.from_pretrained(
             model_name, dtype=torch.float32)
