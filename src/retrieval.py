@@ -1,7 +1,7 @@
 import bm25s
 from .models import DataSource, MinimalSource
-from .helpers import (PROCESSED_PATH, Colors, RetrievalError, BM25_FOLDER,
-                      CHUNK_FILE, WORD_ERROR, CHUNK_ERROR, ParseError)
+from .helpers import (Colors, RetrievalError, Const, ParseError,
+                      Paths)
 import os
 import re
 import json
@@ -37,7 +37,7 @@ def create_indexable_data(chunks: list[DataSource]) -> None:
 
     retriever = bm25s.BM25()
     retriever.index(tokens)
-    output_dir = os.path.join(PROCESSED_PATH, BM25_FOLDER)
+    output_dir = os.path.join(Paths.PROCESSED_PATH, Paths.BM25_FOLDER)
 
     try:
         retriever.save(output_dir)
@@ -50,8 +50,8 @@ def create_indexable_data(chunks: list[DataSource]) -> None:
 
 
 def load_index() -> tuple[Any, list[dict[str, Any]]]:
-    output_dir_bm25 = os.path.join(PROCESSED_PATH, BM25_FOLDER)
-    output_dir_chunks = os.path.join(PROCESSED_PATH, CHUNK_FILE)
+    output_dir_bm25 = os.path.join(Paths.PROCESSED_PATH, Paths.BM25_FOLDER)
+    output_dir_chunks = os.path.join(Paths.PROCESSED_PATH, Paths.CHUNK_FILE)
 
     try:
         retriever = bm25s.BM25.load(output_dir_bm25)
@@ -102,14 +102,14 @@ def retrieve_sources(query: str, k: int,
 
     has_words = any(word != "" for word in query_tokens.vocab)
     if not has_words:
-        return [], WORD_ERROR
+        return [], Const.WORD_ERROR
 
     documents, scores = retriever.retrieve(query_tokens=query_tokens,
                                            corpus=chunk_list,
                                            k=k)
     has_score = any(score != 0. for score in scores[0])
     if not has_score:
-        return [], CHUNK_ERROR
+        return [], Const.CHUNK_ERROR
 
     return build_sources(documents[0]), None
 

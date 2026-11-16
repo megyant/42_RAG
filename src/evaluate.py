@@ -29,7 +29,7 @@ def question_recall(truth: list[MinimalSource],
     return found / len(truth)
 
 
-def load_gorund_truth(dataset_path: str) -> RagDataset:
+def load_ground_truth(dataset_path: str) -> RagDataset:
     try:
         with open(dataset_path, encoding="utf-8") as f:
             dataset = json.load(f)

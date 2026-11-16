@@ -3,13 +3,13 @@ from ..ingesting import read_file
 from langchain_text_splitters import (Language,
                                       RecursiveCharacterTextSplitter)
 from ..models import DataSource
-from ..helpers import OVERLAP
+from ..helpers import Const
 
 
 class Chunk:
     def __init__(self, max_chunk_size: int):
         self.max_chunk_size = max_chunk_size
-        self.overlap = int(max_chunk_size * OVERLAP)
+        self.overlap = int(max_chunk_size * Const.OVERLAP)
 
     def chunk_python(self, file: Path) -> list[DataSource]:
 

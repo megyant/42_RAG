@@ -2,7 +2,7 @@ from pydantic import BaseModel, ValidationError
 from .models import (DataSource, MinimalSearchResults,
                      StudentSearchResults, MinimalAnswer,
                      StudentSearchResultsAndAnswer)
-from .helpers import (PROCESSED_PATH, Colors, CHUNK_FILE,
+from .helpers import (Colors, Paths,
                       IndexingError, RetrievalError)
 from pathlib import Path
 import os
@@ -13,7 +13,7 @@ class ChunkIndex(BaseModel):
 
 
 def save_index(chunks: list[DataSource],
-               output_path: str = PROCESSED_PATH) -> None:
+               output_path: str = Paths.PROCESSED_PATH) -> None:
 
     output_dir = Path(output_path)
 
@@ -25,7 +25,7 @@ def save_index(chunks: list[DataSource],
     try:
         output_dir.mkdir(parents=True, exist_ok=True)
 
-        path = os.path.join(output_dir, CHUNK_FILE)
+        path = os.path.join(output_dir, Paths.CHUNK_FILE)
 
         with open(path, "w",
                   encoding="utf-8") as f:

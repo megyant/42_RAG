@@ -1,14 +1,16 @@
 from .parser.parse_values import (IndexArgs, SearchArgs, SearchDataArgs,
                                   AnswerArgs, AnswerDataArgs, EvaluateArgs)
-from .models import DataSource, MinimalSearchResults, MinimalAnswer
+from .models import (DataSource, MinimalSearchResults, MinimalAnswer,
+                     AnsweredQuestion)
 from .ingesting import collect_files, load_questions
 from .chunking import Chunk
-from .helpers import ParseError, Colors, WORD_ERROR, CHUNK_ERROR
+from .helpers import ParseError, Colors, Const, Paths
 from .create_data_results import (save_index, save_search_results,
                                   save_answer_dataset)
 from .retrieval import (create_indexable_data, retrieve_sources,
                         prepare_retrieval)
 from .generation import read_sources, LLM, load_student_search_results
+from .evaluate import load_ground_truth, question_recall
 from tqdm import tqdm
 from pydantic import ValidationError
 from pathlib import Path
@@ -59,7 +61,7 @@ class Cli:
         save_index(chunks=chunks)
         create_indexable_data(chunks=chunks)
 
-    def search(self, query: str, k: int = 5) -> None:
+    def search(self, query: str, k: int = 3) -> None:
         try:
             args = SearchArgs(k=k, query=query)
         except ValidationError as e:
@@ -70,10 +72,10 @@ class Cli:
 
         sources, warning = retrieve_sources(args.query, args.k, retriever,
                                             chunk_list)
-        if warning == WORD_ERROR:
+        if warning == Const.WORD_ERROR:
             print(f"{Colors.BOLD}{Colors.YELLOW}Warning:{Colors.END} "
                   "The question has no searchable words")
-        elif warning == CHUNK_ERROR:
+        elif warning == Const.CHUNK_ERROR:
             print(f"{Colors.BOLD}{Colors.YELLOW}Warning:{Colors.END} No "
                   "chunk matches this question")
 
@@ -81,8 +83,9 @@ class Cli:
             print(f"{Colors.BOLD}{Colors.BLUE}Result {i}:{Colors.END} "
                   f"{source}")
 
-    def search_dataset(self, dataset_path: str, save_directory: str,
-                       k: int = 5) -> None:
+    def search_dataset(self, dataset_path: str = Paths.DATASET_PATH_CODE,
+                       save_directory: str = Paths.SAVE_DIRECTORY_SEARCH,
+                       k: int = 3) -> None:
         try:
             args = SearchDataArgs(dataset_path=dataset_path,
                                   save_directory=save_directory,
@@ -107,9 +110,9 @@ class Cli:
                                                  args.k,
                                                  retriever,
                                                  chunk_list)
-            if warnings == WORD_ERROR:
+            if warnings == Const.WORD_ERROR:
                 word += 1
-            elif warnings == CHUNK_ERROR:
+            elif warnings == Const.CHUNK_ERROR:
                 chunk += 1
 
             model = MinimalSearchResults(question_id=question
@@ -140,7 +143,7 @@ class Cli:
                             k=args.k,
                             filename=filename)
 
-    def answer(self, query: str, k: int = 5) -> None:
+    def answer(self, query: str, k: int = 3) -> None:
         try:
             args = AnswerArgs(query=query, k=k)
         except ValidationError as e:
@@ -151,11 +154,11 @@ class Cli:
 
         source, warning = retrieve_sources(args.query, args.k, retriever,
                                            chunk_list)
-        if warning == WORD_ERROR:
+        if warning == Const.WORD_ERROR:
             print(f"{Colors.BOLD}{Colors.YELLOW}Warning:{Colors.END} "
                   "The question has no searchable words")
             return
-        elif warning == CHUNK_ERROR:
+        elif warning == Const.CHUNK_ERROR:
             print(f"{Colors.BOLD}{Colors.YELLOW}Warning:{Colors.END} No "
                   "chunk matches this question")
             return
@@ -169,8 +172,12 @@ class Cli:
         response = model.generate_response(args.query, source, texts)
         print(f"\n{Colors.BOLD}{Colors.GREEN}Response: {Colors.END}{response}")
 
-    def answer_dataset(self, student_search_results_path: str,
-                       save_directory: str) -> None:
+    def answer_dataset(
+        self,
+        student_search_results_path: str = Paths.SAVE_DIRECTORY_SEARCH_CODE,
+        save_directory: str = Paths.SAVE_DIRECTORY_ANSWER
+    ) -> None:
+
         try:
             args = AnswerDataArgs(
                 student_search_results_path=student_search_results_path,
@@ -207,45 +214,52 @@ class Cli:
         save_answer_dataset(answers, args.save_directory,
                             results.k, filename)
 
-    def evaluate(self, student_search_results_path: str,
-                 dataset_path: str) -> None:
+    def evaluate(
+        self,
+        student_search_results_path: str = Paths.SAVE_DIRECTORY_SEARCH_CODE,
+        dataset_path: str = Paths.ANSWERED_QUESTIONS_CODE
+    ) -> None:
+
         try:
             args = EvaluateArgs(
                 student_search_results_path=student_search_results_path,
                 dataset_path=dataset_path)
-            results = load_student_search_results(
-                args.student_search_results_path)
-            ground_truth = load_ground_truth(args.dataset_path)
-
-            retrieved = {r.question_id: r.retrieved_sources
-                         for r in results.search_results}
-            known_ids = {q.question_id for q in ground_truth.rag_questions}
-            unknown = {qid for qid in retrieved if qid not in known_ids}
-            if unknown:
-                print(f"{Colors.BOLD}{Colors.YELLOW}Warning:{Colors.END} "
-                      f"{len(unknown)} question_id(s) are not in the dataset")
         except ValidationError as e:
             msgs = [f"'{err['loc'][0]}' - {err['msg']}" for err in e.errors()]
             raise ParseError("\n".join(msgs)) from None
 
+        results = load_student_search_results(
+            args.student_search_results_path)
+        ground_truth = load_ground_truth(args.dataset_path)
+
+        retrieved = {r.question_id: r.retrieved_sources
+                     for r in results.search_results}
+        known_ids = {q.question_id for q in ground_truth.rag_questions}
+        unknown = {qid for qid in retrieved if qid not in known_ids}
+        if unknown:
+            print(f"{Colors.BOLD}{Colors.YELLOW}Warning:{Colors.END} "
+                  f"{len(unknown)} question_id(s) are not in the dataset")
+        missing = len(known_ids - retrieved.keys())
+        if missing:
+            print(f"{Colors.BOLD}{Colors.YELLOW}Warning:{Colors.END} "
+                  f"{missing} question(s) have no search results")
+
+        total = 0.0
+        for q in ground_truth.rag_questions:
+            truth = q.sources if isinstance(q, AnsweredQuestion) else []
+            total += question_recall(truth,
+                                     retrieved.get(q.question_id, []),
+                                     results.k)
+
+        questions = len(ground_truth.rag_questions)
+        recall = total / questions if questions else 0.0
+        print(f"{Colors.BOLD}{Colors.BLUE}Recall@{results.k}:{Colors.END} "
+              f"{recall:.3f}")
+
 
 """
 #TODO
-Starting on Answer dataset
-- Validate arguments - done
-- Load json files from search_dataset - done
-- Load input file into the model - turn it into a StudentSearchResults
-    - check if there are malformed files
-    - each entry is already a MinimalSearchResults
-    - Remember k
-- Load the LLM once - done
-- Loop over search results with tqdm
-    - read_sources(entry.retrieved_sources) - texts
-    - ll.generate_response(entry.question, entry.retrieved_sources, texts) -
-    answer string
-    - build a minimal answer, append it to a list
-- Put the list and k into a StudentSearchResultsAndAnser and write it to
-save_directory, using the same file name as the input file
+README
 
 
 - evaluate, README

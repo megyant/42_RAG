@@ -1,4 +1,4 @@
-from src.helpers import MAX_CHUNK_SIZE
+from src.helpers import Const
 from pydantic import BaseModel, Field
 
 
@@ -7,7 +7,8 @@ class CliArgs(BaseModel):
 
 
 class IndexArgs(CliArgs):
-    max_chunk_size: int = Field(MAX_CHUNK_SIZE, ge=100, le=MAX_CHUNK_SIZE)
+    max_chunk_size: int = Field(Const.MAX_CHUNK_SIZE,
+                                ge=100, le=Const.MAX_CHUNK_SIZE)
 
 
 class SearchArgs(CliArgs):

@@ -1,6 +1,6 @@
 from .ingesting import read_file
 from .models import MinimalSource, StudentSearchResults
-from .helpers import SYSTEM_PROMPT, MAX_CONTEXT, MAX_NEW_TOKENS, ParseError
+from .helpers import Const, ParseError
 from pathlib import Path
 import json
 from pydantic import ValidationError
@@ -58,6 +58,11 @@ class LLM:
         self.tokenizer = AutoTokenizer.from_pretrained(model_name)
         self.model: Any = AutoModelForCausalLM.from_pretrained(
             model_name, dtype=torch.float32)
+        self.SYSTEM_PROMPT: str = ("You answer questions about the vLLM "
+                                   "codebase. Use only the context below. "
+                                   "If the context does not contain the "
+                                   " answer, say you don't know. Be brief "
+                                   "and name the source file you used")
 
     def _build_user_input(self, question: str,
                           sources: list[MinimalSource],
@@ -71,7 +76,7 @@ class LLM:
         return user_input
 
     def _build_prompt(self, user_input: str) -> str:
-        messages = [{"role": "system", "content": SYSTEM_PROMPT},
+        messages = [{"role": "system", "content": self.SYSTEM_PROMPT},
                     {"role": "user", "content": user_input}]
 
         text = self.tokenizer.apply_chat_template(
@@ -88,7 +93,7 @@ class LLM:
 
     def _check_tokens(self, question: str, sources: list[MinimalSource],
                       texts: list[str]) -> str:
-        budget = MAX_CONTEXT - MAX_NEW_TOKENS
+        budget = Const.MAX_CONTEXT - Const.MAX_NEW_TOKENS
 
         while True:
             prompt = self._build_prompt(
@@ -110,7 +115,7 @@ class LLM:
 
         inputs = self.tokenizer(text, return_tensors="pt")
         output = self.model.generate(**inputs,
-                                     max_new_tokens=MAX_NEW_TOKENS,
+                                     max_new_tokens=Const.MAX_NEW_TOKENS,
                                      do_sample=True,
                                      temperature=0.7,
                                      top_p=0.8,

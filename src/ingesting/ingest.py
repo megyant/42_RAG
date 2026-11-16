@@ -1,11 +1,11 @@
 from pathlib import Path
-from src.helpers import RAW_PATH, ParseError
+from src.helpers import Paths, ParseError
 import re
 import json
 from typing import Any
 
 
-def collect_files(raw_path: str = RAW_PATH) -> list[Path]:
+def collect_files(raw_path: str = Paths.RAW_PATH) -> list[Path]:
     root = Path(raw_path)
     suffixes = [".py", ".md", ".txt"]
 
@@ -47,12 +47,3 @@ def load_questions(path: str) -> Any:
 
     except json.JSONDecodeError:
         raise ParseError(f"File '{path}' could not be processed.")
-
-
-"""
-index
-1. Grabs the path of each file
-2. diverts each file to the correct chunker
-3. reads the file
-4. creates the chunks
-"""

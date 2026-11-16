@@ -1,4 +1,4 @@
-.PHONY: install run debug clean fclean lint flake8 mypy lint-strict mypy-strict
+.PHONY: all install run index search search_dataset answer answer_dataset debug clean fclean lint flake8 mypy lint-strict
 
 SGOINFRE_CACHE = /sgoinfre/$(USER)/uv-cache
 SGOINFRE_VENV  = /sgoinfre/$(USER)/venvs/rag
@@ -11,9 +11,10 @@ MYPY_FLAGS = --warn-return-any --warn-unused-ignores \
 
 ##########
 ARGS = index --max_chunk_size 2000
+QUERY = "Explain LoRA"
 DOC_CODE="dataset_code_public.json"
 DOC_DOCS="dataset_docs_public.json"
-DATASET_PATH_= "data/datasets/UnansweredQuestions/"
+DATASET_PATH= "data/datasets/UnansweredQuestions/"
 DIRECTORY_SEARCH = "data/output/search_results/UnansweredQuestions/"
 SAVE_DIRECTORY_ANSWER = "data/output/search_results_and_answer/UnansweredQuestions"
 ##########
@@ -45,13 +46,31 @@ run: install
 	else \
 		uv run python3 -m src $(ARGS); \
 	fi || true
-	
+
+index: install
+	uv run python3 -m src index;
+
+search: install
+	uv run python3 -m src search --query=$(QUERY);
+
+search_dataset: install
+	uv run python3 -m src search_dataset
+
+answer: install
+	uv run python3 -m src answer --query=$(QUERY);
+
+answer_dataset: install
+	uv run python3 -m src answer_dataset
+
+evaluate: install
+	uv run python3 -m src evaluate
+
 
 debug: install
 	@if [ -d /sgoinfre ]; then \
-		HF_HOME=$(SGOINFRE_HF) UV_CACHE_DIR=$(SGOINFRE_CACHE) uv run python -m pdb -m src; \
+		HF_HOME=$(SGOINFRE_HF) UV_CACHE_DIR=$(SGOINFRE_CACHE) uv run python -m pdb -m src $(ARGS); \
 	else \
-		uv run python -m pdb -m src; \
+		uv run python -m pdb -m src $(ARGS); \
 	fi
 
 clean:
