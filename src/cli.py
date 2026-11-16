@@ -1,13 +1,14 @@
 from .parser.parse_values import (IndexArgs, SearchArgs, SearchDataArgs,
                                   AnswerArgs, AnswerDataArgs)
-from .models import DataSource, MinimalSearchResults
+from .models import DataSource, MinimalSearchResults, MinimalAnswer
 from .ingesting import collect_files, load_questions
 from .chunking import Chunk
 from .helpers import ParseError, Colors, WORD_ERROR, CHUNK_ERROR
-from .create_data_results import save_index, save_search_results
+from .create_data_results import (save_index, save_search_results,
+                                  save_answer_dataset)
 from .retrieval import (create_indexable_data, retrieve_sources,
                         prepare_retrieval)
-from .generation import read_sources, LLM
+from .generation import read_sources, LLM, load_student_search_results
 from tqdm import tqdm
 from pydantic import ValidationError
 from pathlib import Path
@@ -86,6 +87,7 @@ class Cli:
             args = SearchDataArgs(dataset_path=dataset_path,
                                   save_directory=save_directory,
                                   k=k)
+
         except ValidationError as e:
             msgs = [f"'{err['loc'][0]}' - {err['msg']}" for err in e.errors()]
             raise ParseError("\n".join(msgs)) from None
@@ -159,7 +161,8 @@ class Cli:
             return
         texts = read_sources(sources=source)
 
-        print(f"\n{Colors.BOLD}{Colors.BLUE}Calling the LLM...{Colors.END}")
+        print(f"\n{Colors.BOLD}{Colors.BLUE}Initializing the LLM..."
+              f"{Colors.END}")
         model = LLM()
         print(f"\n{Colors.BOLD}{Colors.BLUE}Processing the prompt..."
               f"{Colors.END}")
@@ -172,7 +175,31 @@ class Cli:
             args = AnswerDataArgs(
                 student_search_results_path=student_search_results_path,
                 save_directory=save_directory)
-            
+
+            results = load_student_search_results(
+                args.student_search_results_path)
+
+            print(f"\n{Colors.BOLD}{Colors.BLUE}Initializing the LLM..."
+                  f"{Colors.END}")
+            model = LLM()
+            answers = []
+
+            for result in tqdm(results.search_results,
+                               desc="Processing Questions",
+                               leave=False):
+                texts = read_sources(sources=result.retrieved_sources)
+                temp_answer = model.generate_response(
+                    result.question,
+                    result.retrieved_sources,
+                    texts)
+                answer = MinimalAnswer(*temp_answer)
+                answers.append(answer)
+
+            filename = Path(args.student_search_results_path).name
+
+            save_answer_dataset(answers, student_search_results_path,
+                                args.k, filename)
+
         except ValidationError as e:
             msgs = [f"'{err['loc'][0]}' - {err['msg']}" for err in e.errors()]
             raise ParseError("\n".join(msgs)) from None
@@ -184,15 +211,24 @@ class Cli:
 
 """
 #TODO
-Starting on Answer
-- Load index + retrieve sources (reuse)
-- Read each source's text from its file
-- Load Qwen and its tokenizer once
-- generate_answer(question, texts) -> str
-- Cli.answer prints a MinimalAnswer
+Starting on Answer dataset
+- Validate arguments - done
+- Load json files from search_dataset - done
+- Load input file into the model - turn it into a StudentSearchResults
+    - check if there are malformed files
+    - each entry is already a MinimalSearchResults
+    - Remember k
+- Load the LLM once - done
+- Loop over search results with tqdm
+    - read_sources(entry.retrieved_sources) - texts
+    - ll.generate_response(entry.question, entry.retrieved_sources, texts) -
+    answer string
+    - build a minimal answer, append it to a list
+- Put the list and k into a StudentSearchResultsAndAnser and write it to
+save_directory, using the same file name as the input file
 
 
-- Answer, answer_dataset, evaluate, README
+- evaluate, README
 
 - Reorganize folders, test
 """

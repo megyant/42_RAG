@@ -1,7 +1,8 @@
 from .ingesting import read_file
 from .models import MinimalSource, StudentSearchResults
-from .helpers import SYSTEM_PROMPT, MAX_CONTEXT, MAX_NEW_TOKENS
+from .helpers import SYSTEM_PROMPT, MAX_CONTEXT, MAX_NEW_TOKENS, ParseError
 from pathlib import Path
+import json
 from transformers import AutoModelForCausalLM, AutoTokenizer
 import torch
 from typing import Any
@@ -28,9 +29,24 @@ def read_sources(sources: list[MinimalSource]) -> list[str]:
 
     return texts
 
-def load_model(student_search_results_path: str) -> StudentSearchResults:
-    with student_search_results_path open as f:
-        
+
+def load_student_search_results(
+        student_search_results_path: str) -> StudentSearchResults:
+    try:
+        with open(student_search_results_path,
+                  encoding="utf-8", newline="")as f:
+            searches = json.load(f)
+
+        search_results = StudentSearchResults(**searches)
+
+        return search_results
+    except OSError:
+        raise ParseError(f"File '{student_search_results_path}' "
+                         "could not be loaded.")
+
+    except json.JSONDecodeError:
+        raise ParseError(f"File '{student_search_results_path}' "
+                         "could not be processed.")
 
 
 class LLM:
