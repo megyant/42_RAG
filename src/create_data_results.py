@@ -91,7 +91,7 @@ def save_answer_dataset(answers: list[MinimalAnswer],
                   encoding="utf-8") as f:
             f.write(data.model_dump_json(indent=4))
 
-        print(f"{Colors.BOLD}{Colors.GREEN}Success:{Colors.END} Search "
+        print(f"{Colors.BOLD}{Colors.GREEN}Success:{Colors.END} Answer "
               "complete. Saved under "
               f"'{output_dir}'.")
     except OSError as e:

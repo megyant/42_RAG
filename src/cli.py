@@ -175,34 +175,37 @@ class Cli:
             args = AnswerDataArgs(
                 student_search_results_path=student_search_results_path,
                 save_directory=save_directory)
-
-            results = load_student_search_results(
-                args.student_search_results_path)
-
-            print(f"\n{Colors.BOLD}{Colors.BLUE}Initializing the LLM..."
-                  f"{Colors.END}")
-            model = LLM()
-            answers = []
-
-            for result in tqdm(results.search_results,
-                               desc="Processing Questions",
-                               leave=False):
-                texts = read_sources(sources=result.retrieved_sources)
-                temp_answer = model.generate_response(
-                    result.question,
-                    result.retrieved_sources,
-                    texts)
-                answer = MinimalAnswer(*temp_answer)
-                answers.append(answer)
-
-            filename = Path(args.student_search_results_path).name
-
-            save_answer_dataset(answers, student_search_results_path,
-                                args.k, filename)
-
         except ValidationError as e:
             msgs = [f"'{err['loc'][0]}' - {err['msg']}" for err in e.errors()]
             raise ParseError("\n".join(msgs)) from None
+
+        results = load_student_search_results(
+            args.student_search_results_path)
+
+        print(f"\n{Colors.BOLD}{Colors.BLUE}Initializing the LLM..."
+              f"{Colors.END}")
+        model = LLM()
+        answers = []
+
+        for result in tqdm(results.search_results,
+                           desc="Processing Questions",
+                           leave=False):
+            texts = read_sources(sources=result.retrieved_sources)
+            temp_answer = model.generate_response(
+                result.question,
+                result.retrieved_sources,
+                texts)
+            answer = MinimalAnswer(
+                question_id=result.question_id,
+                question=result.question,
+                retrieved_sources=result.retrieved_sources,
+                answer=temp_answer)
+            answers.append(answer)
+
+        filename = Path(args.student_search_results_path).name
+
+        save_answer_dataset(answers, args.save_directory,
+                            results.k, filename)
 
     def evaluate(self, student_search_results_path: str,
                  dataset_path: str) -> None:

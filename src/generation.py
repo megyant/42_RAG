@@ -37,7 +37,7 @@ def load_student_search_results(
                   encoding="utf-8", newline="")as f:
             searches = json.load(f)
 
-        search_results = StudentSearchResults(**searches)
+        search_results = StudentSearchResults(searches)
 
         return search_results
     except OSError:
