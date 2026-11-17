@@ -1,5 +1,29 @@
-# 42_RAG
+*This project has been created as a part of the 42 curriculum by <mbotelho>mbotelho*
 
+# Rage Against the Machine
+
+## Description
+
+### System Architecture
+RAG pipeline components
+
+### Chunking strategy
+
+### Retrieval method
+
+### Performance analysis
+
+### Design decisions
+
+### Challenges faced
+
+## Instructions
+
+### Instalation
+
+### Example Usage
+
+## Resources
 sources:
 - https://jillanisofttech.medium.com/optimizing-chunking-strategies-for-retrieval-augmented-generation-rag-applications-with-python-c3ab5060d3e4
 - https://community.databricks.com/t5/technical-blog/the-ultimate-guide-to-chunking-strategies-for-rag-applications/ba-p/113089
@@ -20,53 +44,16 @@ sources:
 - https://docs.langchain.com/oss/python/langchain/overview
 
 - https://arxiv.org/pdf/2506.15655
-- https://docs.python.org/3/library/ast.html
 - https://www.twig.so/dev/rag-scenarios-and-solutions/chunking/code-splitting
 
 - https://reference.langchain.com/python/langchain-text-splitters/markdown/MarkdownHeaderTextSplitter
 
-
-
-BM25 is the reference
-
-
-
-How to import the llm:
-
-import torch
-from transformers import AutoModelForCausalLM, AutoTokenizer
-
-self.tokenizer = AutoTokenizer.from_pretrained(model_name)
-self.model = AutoModelForCausalLM.from_pretrained(
-    model_name,
-    dtype=torch.float32,   # explicit; v5.17 otherwise uses "auto" (likely bf16)
-).eval()
-
-def generate(self, context: str, question: str) -> str:
-    messages = [
-        {"role": "system", "content": "Answer using only the provided context."},
-        {"role": "user", "content": f"Context:\n{context}\n\nQuestion: {question}"},
-    ]
-    prompt = self.tokenizer.apply_chat_template(
-        messages,
-        tokenize=False,
-        add_generation_prompt=True,
-        enable_thinking=False,   # Qwen3: avoid long thinking on CPU
-    )
-    inputs = self.tokenizer(
-        prompt,
-        return_tensors="pt",
-        truncation=True,
-        max_length=8192,         # keep CPU context manageable
-    )
-    with torch.inference_mode():
-        output_ids = self.model.generate(
-            **inputs,
-            max_new_tokens=128,
-            do_sample=False,
-            repetition_penalty=1.15,
-            eos_token_id=self.tokenizer.eos_token_id,
-            pad_token_id=self.tokenizer.eos_token_id,
-        )
-    generated = output_ids[0][inputs["input_ids"].shape[1]:]
-    return self.tokenizer.decode(generated, skip_special_tokens=True).strip()
+### Use of Artificial Intelligence
+Claude was used to optimize the development workflow of this project. Some usages included:
+- Learn the necessary concepts
+- Assist with testing the program
+- Logical improvement of functions
+- Improve understanding of the constrained decoding concepts
+- Give ideas of implementations
+- Quick and small debug checks througout the making of this program
+- Improve this README wording

@@ -2,8 +2,7 @@ from ..parser.parse_args import (IndexArgs, SearchArgs, SearchDataArgs,
                                  AnswerArgs, AnswerDataArgs, EvaluateArgs)
 from ..helpers.models import (DataSource, MinimalSearchResults, MinimalAnswer,
                               AnsweredQuestion)
-from ..chunking import collect_files, load_questions
-from . import Chunk
+from ..chunking import collect_files, load_questions, Chunk
 from ..helpers import ParseError, Colors, Const, Paths
 from .data_results import (save_index, save_search_results,
                            save_answer_dataset)
@@ -262,14 +261,3 @@ class Cli:
         recall = total / questions if questions else 0.0
         print(f"{Colors.BOLD}{Colors.BLUE}Recall@{results.k}:{Colors.END} "
               f"{recall:.3f}")
-
-
-"""
-#TODO
-README
-
-
-- evaluate, README
-
-- Reorganize folders, test
-"""
