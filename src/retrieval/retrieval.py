@@ -29,7 +29,8 @@ def make_tokenizer() -> bm25s.tokenization.Tokenizer:
 
 
 def create_indexable_data(chunks: list[DataSource]) -> None:
-    texts = [c.content for c in chunks]
+    texts = [c.file_path.replace(Paths.RAW_PATH, "") + "\n" + 
+             c.content for c in chunks]
 
     tokenizer = make_tokenizer()
     tokens = tokenizer.tokenize(texts, return_as="tuple",
