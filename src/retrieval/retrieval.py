@@ -1,7 +1,7 @@
 import bm25s
-from .models import DataSource, MinimalSource
-from .helpers import (Colors, RetrievalError, Const, ParseError,
-                      Paths)
+from ..helpers.models import DataSource, MinimalSource
+from ..helpers import (Colors, RetrievalError, Const, ParseError,
+                       Paths)
 import os
 import re
 import json

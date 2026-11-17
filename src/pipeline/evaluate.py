@@ -1,7 +1,7 @@
-from .models import MinimalSource, RagDataset
+from ..helpers.models import MinimalSource, RagDataset
 import json
 from pydantic import ValidationError
-from .helpers import ParseError
+from ..helpers import ParseError
 
 
 def iou(a: MinimalSource, b: MinimalSource) -> float:

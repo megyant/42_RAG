@@ -1,8 +1,8 @@
 from pathlib import Path
-from ..ingesting import read_file
+from . import read_file
 from langchain_text_splitters import (Language,
                                       RecursiveCharacterTextSplitter)
-from ..models import DataSource
+from ..helpers.models import DataSource
 from ..helpers import Const
 
 

@@ -1,6 +1,6 @@
-from .ingesting import read_file
-from .models import MinimalSource, StudentSearchResults
-from .helpers import Const, ParseError
+from ..chunking import read_file
+from ..helpers.models import MinimalSource, StudentSearchResults
+from ..helpers import Const, ParseError
 from pathlib import Path
 import json
 from pydantic import ValidationError

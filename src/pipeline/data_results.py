@@ -1,9 +1,9 @@
 from pydantic import BaseModel, ValidationError
-from .models import (DataSource, MinimalSearchResults,
-                     StudentSearchResults, MinimalAnswer,
-                     StudentSearchResultsAndAnswer)
-from .helpers import (Colors, Paths,
-                      IndexingError, RetrievalError)
+from ..helpers.models import (DataSource, MinimalSearchResults,
+                              StudentSearchResults, MinimalAnswer,
+                              StudentSearchResultsAndAnswer)
+from ..helpers import (Colors, Paths,
+                       IndexingError, RetrievalError)
 from pathlib import Path
 import os
 

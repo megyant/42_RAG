@@ -1,37 +1,20 @@
-from .parser.parse_values import (IndexArgs, SearchArgs, SearchDataArgs,
-                                  AnswerArgs, AnswerDataArgs, EvaluateArgs)
-from .models import (DataSource, MinimalSearchResults, MinimalAnswer,
-                     AnsweredQuestion)
-from .ingesting import collect_files, load_questions
-from .chunking import Chunk
-from .helpers import ParseError, Colors, Const, Paths
-from .create_data_results import (save_index, save_search_results,
-                                  save_answer_dataset)
-from .retrieval import (create_indexable_data, retrieve_sources,
-                        prepare_retrieval)
-from .generation import read_sources, LLM, load_student_search_results
+from ..parser.parse_args import (IndexArgs, SearchArgs, SearchDataArgs,
+                                 AnswerArgs, AnswerDataArgs, EvaluateArgs)
+from ..helpers.models import (DataSource, MinimalSearchResults, MinimalAnswer,
+                              AnsweredQuestion)
+from ..chunking import collect_files, load_questions
+from . import Chunk
+from ..helpers import ParseError, Colors, Const, Paths
+from .data_results import (save_index, save_search_results,
+                           save_answer_dataset)
+from ..retrieval.retrieval import (create_indexable_data, retrieve_sources,
+                                   prepare_retrieval)
+from ..generation.generation import (read_sources, LLM,
+                                     load_student_search_results)
 from .evaluate import load_ground_truth, question_recall
 from tqdm import tqdm
 from pydantic import ValidationError
 from pathlib import Path
-
-"""
-index –max_chunk_size <int>
-search <query> –k <int>
-search_dataset –dataset_path <path> –k <int> –save_directory <dir>
-answer <query> –k <int>
-answer_dataset –student_search_results_path <path> –save_directory <dir>
-evaluate –student_search_results_path <path> –dataset_path <path>
-"""
-
-
-""" from models import (MinimalSource, UnansweredQuestion,
-                    AnsweredQuestion, RagDataset,
-                    MinimalSearchResults, MinimalAnswer,
-                    StudentSearchResults,
-                    StudentSearchResultsAndAnswer) """
-
-""" Each should create a manager with the customized values """
 
 
 class Cli:

@@ -5,7 +5,7 @@ from .helpers import Colors, CliError
 
 def main() -> None:
     try:
-        from .cli import Cli
+        from .pipeline.cli import Cli
         fire.Fire(Cli)
 
     except CliError as e:
