@@ -1,11 +1,7 @@
 from .parser.parse_values import (IndexArgs, SearchArgs, SearchDataArgs,
                                   AnswerArgs, AnswerDataArgs, EvaluateArgs)
-<<<<<<< Updated upstream
 from .models import (DataSource, MinimalSearchResults, MinimalAnswer,
                      AnsweredQuestion)
-=======
-from .models import DataSource, MinimalSearchResults, MinimalAnswer, AnsweredQuestion
->>>>>>> Stashed changes
 from .ingesting import collect_files, load_questions
 from .chunking import Chunk
 from .helpers import ParseError, Colors, Const, Paths
@@ -218,52 +214,16 @@ class Cli:
         save_answer_dataset(answers, args.save_directory,
                             results.k, filename)
 
-<<<<<<< Updated upstream
     def evaluate(
         self,
         student_search_results_path: str = Paths.SAVE_DIRECTORY_SEARCH_CODE,
         dataset_path: str = Paths.ANSWERED_QUESTIONS_CODE
     ) -> None:
 
-=======
-    def evaluate(self,
-                 student_search_results_path: str,
-                 dataset_path: str) -> None:
->>>>>>> Stashed changes
         try:
             args = EvaluateArgs(
                 student_search_results_path=student_search_results_path,
                 dataset_path=dataset_path)
-<<<<<<< Updated upstream
-=======
-            results = load_student_search_results(
-                args.student_search_results_path)
-            ground_truth = load_ground_truth(args.dataset_path)
-
-            retrieved = {r.question_id: r.retrieved_sources
-                         for r in results.search_results}
-            known_ids = {q.question_id for q in ground_truth.rag_questions}
-            unknown = {qid for qid in retrieved if qid not in known_ids}
-            if unknown:
-                print(f"{Colors.BOLD}{Colors.YELLOW}Warning:{Colors.END} "
-                      f"{len(unknown)} question_id(s) are not in the dataset")
-
-            missing = len(known_ids - retrieved.keys())
-            print(f"{Colors.BOLD}{Colors.YELLOW}Warning:{Colors.END} "
-                  f"{missing} question(s) have no search results")
-
-            total = 0.0
-            for q in ground_truth.rag_questions:
-                truth = q.sources if isinstance(q, AnsweredQuestion) else []
-                total += question_recall(truth,
-                                         retrieved.get(q.question_id, []),
-                                         results.k)
-            questions = len(ground_truth.rag_questions)
-            recall = total / questions if questions else 0.0
-
-            print(f"{Colors.BOLD}{Colors.BLUE}Recall@{results.k}:"
-                  f"{Colors.END} {recall:.3f}")
->>>>>>> Stashed changes
         except ValidationError as e:
             msgs = [f"'{err['loc'][0]}' - {err['msg']}" for err in e.errors()]
             raise ParseError("\n".join(msgs)) from None

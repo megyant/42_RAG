@@ -222,3 +222,6 @@ __marimo__/
 
 data/processed/
 data/output/
+# exam rehearsal
+evaluations/
+data/datasets/private/
