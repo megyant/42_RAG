@@ -9,11 +9,28 @@ import os
 
 
 class ChunkIndex(BaseModel):
+    """
+    Container model representing an indexed collection of data
+    chunks.
+    """
     chunks: list[DataSource]
 
 
 def save_index(chunks: list[DataSource],
                output_path: str = Paths.PROCESSED_PATH) -> None:
+    """
+    Serialize and save a list of data chunks to a JSON index file in the
+    specified output directory.
+
+    Args:
+        chunks (list[DataSource]): The list of data chunks to index and save.
+        output_path (str): The directory where the index file will be
+        stored. Defaults to Paths.PROCESSED_PATH.
+
+    Raises:
+        IndexingError: If validation of the chunk index fails or an I/O
+        error occurs during saving.
+    """
 
     output_dir = Path(output_path)
 
@@ -42,6 +59,20 @@ def save_search_results(search_results: list[MinimalSearchResults],
                         output_path: str,
                         k: int,
                         filename: str) -> None:
+    """
+    Serialize and save student search results to a JSON file.
+
+    Args:
+        search_results (list[MinimalSearchResults]): The list of search
+        result items to save.
+        output_path (str): The target output directory path.
+        k (int): The number of retrieved sources per query.
+        filename (str): The name of the output file.
+
+    Raises:
+        RetrievalError: If data validation fails or an I/O error occurs
+        while writing the file.
+    """
 
     output_dir = Path(output_path)
 
@@ -71,6 +102,20 @@ def save_answer_dataset(answers: list[MinimalAnswer],
                         output_path: str,
                         k: int,
                         filename: str) -> None:
+    """
+    Serialize and save generated student answers and search results to a
+    JSON file.
+
+    Args:
+        answers (list[MinimalAnswer]): The list of answer items to save.
+        output_path (str): The target output directory path.
+        k (int): The number of retrieved sources per query.
+        filename (str): The name of the output file.
+
+    Raises:
+        RetrievalError: If data validation fails or an I/O error occurs
+        while writing the file.
+    """
 
     output_dir = Path(output_path)
 

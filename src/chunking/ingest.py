@@ -6,6 +6,17 @@ from typing import Any
 
 
 def collect_files(raw_path: str = Paths.RAW_PATH) -> list[Path]:
+    """
+    Collect all files with specified suffixes (.py, .md, .txt) recursively
+    from a root path.
+
+    Args:
+        raw_path (str): The root directory path to search within.
+        Defaults to Paths.RAW_PATH.
+
+    Returns:
+        list[Path]: A sorted list of file paths matching the criteria.
+    """
     root = Path(raw_path)
     suffixes = [".py", ".md", ".txt"]
 
@@ -19,6 +30,15 @@ def collect_files(raw_path: str = Paths.RAW_PATH) -> list[Path]:
 
 
 def read_file(path: Path) -> str | None:
+    """Read and return the text content of a file with UTF-8 encoding.
+
+    Args:
+        path (Path): The path to the file to be read.
+
+    Returns:
+        str | None: The content of the file as a string, or None if an
+        error or decoding failure occurs.
+    """
     try:
         with open(path, encoding="utf-8", newline="") as f:
             return f.read()
@@ -33,10 +53,32 @@ def read_file(path: Path) -> str | None:
 
 
 def split_endings(text: str) -> list[str]:
+    """
+    Split a text string into lines while preserving their respective
+    line endings.
+
+    Args:
+        text (str): The input text string to split.
+
+    Returns:
+        list[str]: A list of lines, each including its trailing line ending.
+    """
     return re.findall("[^\r\n]*(?:\r\n|\r|\n)|[^\r\n]+$", text)
 
 
 def load_questions(path: str) -> Any:
+    """
+    Load and parse JSON data from a file.
+
+    Args:
+        path (str): The path to the JSON file to load.
+
+    Returns:
+        Any: The parsed JSON data.
+
+    Raises:
+        ParseError: If the file cannot be read or contains invalid JSON.
+    """
     try:
         with open(path, encoding="utf-8") as f:
             questions = json.load(f)

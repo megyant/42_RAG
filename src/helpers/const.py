@@ -3,6 +3,8 @@ from dataclasses import dataclass
 
 @dataclass(frozen=True)
 class Const:
+    """Configuration constants for chunking, error handling,
+    and token limits."""
     OVERLAP: float = 0.10
     MAX_CHUNK_SIZE: int = 2000
     WORD_ERROR: str = "WORD_ERROR"
@@ -13,6 +15,8 @@ class Const:
 
 @dataclass(frozen=True)
 class Paths:
+    """File system paths for datasets, raw/processed files,
+    and search output directories."""
     CHUNK_FILE: str = "chunks.json"
     BM25_FOLDER: str = "bm25"
     RAW_PATH: str = "data/raw"

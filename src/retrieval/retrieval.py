@@ -12,6 +12,16 @@ PARTS = re.compile(r"[A-Z]+(?=[A-Z][a-z])|[A-Z]?[a-z]+|[A-Z]+|\d+")
 
 
 def code_splitter(text: str) -> list[str]:
+    """
+    Split text into words and sub-tokens using regex patterns,
+    returning lowercase tokens.
+
+    Args:
+        text (str): The input text string to split.
+
+    Returns:
+        list[str]: A list of lowercase tokens extracted from the text.
+    """
     tokens = []
     for word in WORD.findall(text):
         tokens.append(word)
@@ -23,13 +33,30 @@ def code_splitter(text: str) -> list[str]:
 
 
 def make_tokenizer() -> bm25s.tokenization.Tokenizer:
+    """
+    Create and configure a bm25s Tokenizer using the custom code
+    splitter and English stopwords.
+
+    Returns:
+        bm25s.tokenization.Tokenizer: The configured tokenizer instance.
+    """
     return bm25s.tokenization.Tokenizer(splitter=code_splitter,
                                         lower=False,
                                         stopwords="en")
 
 
 def create_indexable_data(chunks: list[DataSource]) -> None:
-    texts = [c.file_path.replace(Paths.RAW_PATH, "") + "\n" + 
+    """
+    Create a BM25 index from data chunks and save it to the processed
+    output directory.
+
+    Args:
+        chunks (list[DataSource]): The list of data chunks to index.
+
+    Raises:
+        RetrievalError: If an I/O error occurs while saving the BM25 index.
+    """
+    texts = [c.file_path.replace(Paths.RAW_PATH, "") + "\n" +
              c.content for c in chunks]
 
     tokenizer = make_tokenizer()
@@ -51,6 +78,17 @@ def create_indexable_data(chunks: list[DataSource]) -> None:
 
 
 def load_index() -> tuple[Any, list[dict[str, Any]]]:
+    """
+    Load the BM25 retriever index and chunk data from disk.
+
+    Returns:
+        tuple[Any, list[dict[str, Any]]]: A tuple containing the loaded
+        retriever and the list of chunk dictionaries.
+
+    Raises:
+        RetrievalError: If the index files are missing, corrupted, or have
+        a length mismatch.
+    """
     output_dir_bm25 = os.path.join(Paths.PROCESSED_PATH, Paths.BM25_FOLDER)
     output_dir_chunks = os.path.join(Paths.PROCESSED_PATH, Paths.CHUNK_FILE)
 
@@ -77,6 +115,19 @@ def load_index() -> tuple[Any, list[dict[str, Any]]]:
 
 
 def prepare_retrieval(k: int) -> tuple[Any, list[dict[str, Any]]]:
+    """
+    Prepare for retrieval by loading the index and validating that
+    k does not exceed the chunk count.
+
+    Args:
+        k (int): The number of results to retrieve.
+
+    Returns:
+        tuple[Any, list[dict[str, Any]]]: The loaded retriever and chunk list.
+
+    Raises:
+        ParseError: If k is greater than the total number of chunks.
+    """
     retriever, chunk_list = load_index()
 
     if k > len(chunk_list):
@@ -91,6 +142,22 @@ def retrieve_sources(query: str, k: int,
                      retriever: Any,
                      chunk_list: list[dict[str, Any]]) -> \
                          tuple[list[MinimalSource], str | None]:
+    """
+    Retrieve top-k matching MinimalSource items for a given search query.
+
+    Args:
+        query (str): The search query string.
+        k (int): The number of sources to retrieve.
+        retriever (Any): The BM25 retriever instance.
+        chunk_list (list[dict[str, Any]]): The list of available data chunks.
+
+    Returns:
+        tuple[list[MinimalSource], str | None]: A tuple containing the
+        list of retrieved sources and an optional warning code.
+
+    Raises:
+        RetrievalError: If the tokenizer returns an unexpected type.
+    """
 
     tokenizer = make_tokenizer()
 
@@ -116,5 +183,15 @@ def retrieve_sources(query: str, k: int,
 
 
 def build_sources(documents_row: list[Any]) -> list[MinimalSource]:
+    """
+    Convert raw retrieved document rows into validated MinimalSource models.
+
+    Args:
+        documents_row (list[Any]): A list of raw document/chunk
+        dictionaries from retrieval.
+
+    Returns:
+        list[MinimalSource]: A list of validated MinimalSource model instances.
+    """
     return [MinimalSource.model_validate(chunk) for
             chunk in documents_row]

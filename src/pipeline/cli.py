@@ -17,7 +17,20 @@ from pathlib import Path
 
 
 class Cli:
+    """
+    Command Line Interface for managing indexing, searching, answering, and
+    evaluation in the RAG pipeline.
+    """
     def index(self, max_chunk_size: int = 2000) -> None:
+        """
+        Collect, chunk, and index source files from the raw directory.
+
+        Args:
+            max_chunk_size (int): Maximum size of each chunk. Defaults to 2000.
+
+        Raises:
+            ParseError: If validation of indexing arguments fails.
+        """
         try:
             args = IndexArgs(max_chunk_size=max_chunk_size)
         except ValidationError as e:
@@ -44,6 +57,16 @@ class Cli:
         create_indexable_data(chunks=chunks)
 
     def search(self, query: str, k: int = 3) -> None:
+        """
+        Search the indexed chunks for a given query and print the top results.
+
+        Args:
+            query (str): The search query string.
+            k (int): Number of top results to return. Defaults to 3.
+
+        Raises:
+            ParseError: If search argument validation fails.
+        """
         try:
             args = SearchArgs(k=k, query=query)
         except ValidationError as e:
@@ -68,6 +91,21 @@ class Cli:
     def search_dataset(self, dataset_path: str = Paths.DATASET_PATH_CODE,
                        save_directory: str = Paths.SAVE_DIRECTORY_SEARCH,
                        k: int = 10) -> None:
+        """
+        Batch search across a dataset of questions and save the resulting
+        search results.
+
+        Args:
+            dataset_path (str): Path to the dataset JSON file. Defaults to
+            Paths.DATASET_PATH_CODE.
+            save_directory (str): Directory where search results will be
+            saved. Defaults to Paths.SAVE_DIRECTORY_SEARCH.
+            k (int): Number of sources to retrieve per question. Defaults to
+            10.
+
+        Raises:
+            ParseError: If argument validation fails.
+        """
         try:
             args = SearchDataArgs(dataset_path=dataset_path,
                                   save_directory=save_directory,
@@ -126,6 +164,16 @@ class Cli:
                             filename=filename)
 
     def answer(self, query: str, k: int = 3) -> None:
+        """
+        Retrieve relevant sources for a query and generate an LLM response.
+
+        Args:
+            query (str): The question query string.
+            k (int): Number of sources to retrieve. Defaults to 3.
+
+        Raises:
+            ParseError: If answer argument validation fails.
+        """
         try:
             args = AnswerArgs(query=query, k=k)
         except ValidationError as e:
@@ -159,6 +207,18 @@ class Cli:
         student_search_results_path: str = Paths.SAVE_DIRECTORY_SEARCH_CODE,
         save_directory: str = Paths.SAVE_DIRECTORY_ANSWER
     ) -> None:
+        """Batch generate answers for a dataset of search results using the
+        LLM.
+
+        Args:
+            student_search_results_path (str): Path to the student search
+            results JSON file. Defaults to Paths.SAVE_DIRECTORY_SEARCH_CODE.
+            save_directory (str): Directory where answer outputs will be
+            saved. Defaults to Paths.SAVE_DIRECTORY_ANSWER.
+
+        Raises:
+            ParseError: If validation of arguments fails.
+        """
 
         try:
             args = AnswerDataArgs(
@@ -199,6 +259,18 @@ class Cli:
     def evaluate(self,
                  student_search_results_path: str,
                  dataset_path: str) -> None:
+        """Evaluate student search results against a reference dataset
+        by calculating recall.
+
+        Args:
+            student_search_results_path (str): Path to the student search
+            results JSON file.
+            dataset_path (str): Path to the reference ground truth dataset
+            JSON file.
+
+        Raises:
+            ParseError: If argument validation fails.
+        """
         try:
             args = EvaluateArgs(
                 student_search_results_path=student_search_results_path,
