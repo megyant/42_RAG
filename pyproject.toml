@@ -12,7 +12,6 @@ dependencies = [
     "flake8>=7.3.0",
     "flake8-pyproject",
     "mypy>=2.1.0",
-    "vllm>=0.10.1",
     "langchain-text-splitters",
     "tqdm",
     "bm25s",
@@ -25,7 +24,6 @@ dependencies = [
 extend-exclude = [
     ".venv",
     "vllm*",
-    "others_to_delete",
     ".vscode",
     ".mypy_cache",
     "__pycache__"
@@ -35,8 +33,6 @@ extend-exclude = [
 exclude = [
     ".venv",
     "data",
-    "moulinette_RAG",
-    "others_to_delete",
     ".vscode",
     ".mypy_cache",
     "__pycache__"
