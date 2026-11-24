@@ -1,5 +1,6 @@
 from ..parser.parse_args import (IndexArgs, SearchArgs, SearchDataArgs,
-                                 AnswerArgs, AnswerDataArgs, EvaluateArgs)
+                                 AnswerArgs, AnswerDataArgs, EvaluateArgs,
+                                 ServerArgs)
 from ..helpers.models import (DataSource, MinimalSearchResults, MinimalAnswer,
                               AnsweredQuestion)
 from ..chunking import collect_files, load_questions, Chunk
@@ -307,3 +308,19 @@ class Cli:
 
         print(f"{Colors.BOLD}{Colors.BLUE}Recall@{results.k}:"
               f"{Colors.END} {recall:.3f}")
+
+    def server(self, host: str = "127.0.0.1", port: int = 8000) -> None:
+        """ Run a Local HTTP API
+        Args:
+            host (str): Machine or network destination.
+            port (int): Specific service or application listening on
+            that machine.
+        """
+        try:
+            args = ServerArgs(host=host, port=port)
+        except ValidationError as e:
+            msgs = [f"'{err['loc'][0]}' - {err['msg']}" for err in e.errors()]
+            raise ParseError("\n".join(msgs)) from None
+        from ..api.server import app
+        import uvicorn
+        uvicorn.run(app=app, host=args.host, port=args.port)

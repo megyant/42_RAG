@@ -49,9 +49,17 @@ class MinimalSearchResults(BaseModel):
     retrieved_sources: List[MinimalSource]
 
 
+class SearchResponse(MinimalSearchResults):
+    warning: str | None = None
+
+
 class MinimalAnswer(MinimalSearchResults):
     """Extends MinimalSearchResults with an answer string."""
     answer: str
+
+
+class AnswerResponse(MinimalAnswer):
+    warning: str | None = None
 
 
 class StudentSearchResults(BaseModel):

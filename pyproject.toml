@@ -17,7 +17,9 @@ dependencies = [
     "bm25s",
     "PyStemmer",
     "transformers",
-    "torch"
+    "torch",
+    "fastapi",
+    "uvicorn",
 ]
 
 [tool.flake8]

@@ -65,6 +65,9 @@ answer_dataset: install
 evaluate: install
 	uv run python3 -m src evaluate
 
+server: install
+	uv run python3 -m src server
+
 
 debug: install
 	@if [ -d /sgoinfre ]; then \

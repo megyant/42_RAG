@@ -1,4 +1,4 @@
-*This project has been created as a part of the 42 curriculum by <mbotelho>mbotelho*
+*This project has been created as part of the 42 curriculum by mbotelho.*
 
 # Rage Against the Machine
 
@@ -8,7 +8,7 @@ Implementation of Retrieval-Augmented Generation over the vLLM codebase.
 
 Retrieval-Augmented Generation (RAG) is an AI approach that combines searching for relevant information with generating a response. In RAG, external sources - such as documents or databases - are provided to a model so it can produce a better, more grounded answer, instead of relying only on what it learned during training.
 
-This project builds a RAG system that answers questions about the [vLLM](https://github.com/vllm-project/vllm) repository (version 0.10.1). Given a question, it finds the most relevant pieces of the codebase and documentation, and passes them to a small local language model, `Qwen/Qwen3-0.6B`, which writes an answer based on them.
+This project builds a RAG system that answers questions about the [vLLM](https://vllm.ai/) repository (version 0.10.1). Given a question, it finds the most relevant pieces of the codebase and documentation, and passes them to a small local language model, `Qwen/Qwen3-0.6B`, which writes an answer based on them.
 
 The pipeline has four stages:
 
@@ -63,7 +63,7 @@ The 10% overlap means a sentence cut at a chunk boundary still appears whole in 
 
 ### Retrieval method
 
-Retrieval uses **BM25** through the [`bm25s`](https://github.com/xhluca/bm25s) library.
+Retrieval uses **BM25** through the [`bm25s`](https://bm25s.github.io/) library.
 
 BM25 scores each chunk by how many of the question's words it contains, weighted so that:
 - rare words (e.g. `lora`, `speculative`) count much more than common ones (*IDF*),
@@ -156,6 +156,7 @@ Every command runs as `uv run python -m src <command> [options]`:
 | `answer <query> --k <int>` | Retrieve sources and answer one question |
 | `answer_dataset --student_search_results_path <path> --save_directory <dir>` | Answer every question in a search results file |
 | `evaluate --student_search_results_path <path> --dataset_path <path>` | Print recall@k against the ground truth |
+| `server --host <host> --port <port>` | Starts local HTTP API server |
 
 Other Makefile rules: `make lint`, `make lint-strict`, `make clean`, `make debug`.
 
@@ -186,6 +187,64 @@ uv run python -m src answer_dataset \
     --save_directory data/output/search_results_and_answer/UnansweredQuestions
 ```
 
+### Local HTTP API
+Besides the CLI, the system can be driven over a small local HTTP API built
+with [FastAPI](https://fastapi.tiangolo.com/) and served by
+[uvicorn](https://www.uvicorn.dev/). The index and the LLM are loaded once
+at startup and reused by every request, so answers skip the model loading
+time of the CLI.
+
+**Start the server** (the index must exist, run `index` first):
+
+```bash
+uv run python -m src server                  # http://127.0.0.1:8000
+uv run python -m src server --port 8001      # custom port (1024-65535)
+make server
+```
+
+Opening `http://127.0.0.1:8000` redirects to `/docs`, an interactive page
+where every route can be tried from the browser ("Try it out" → "Execute").
+
+**Routes**
+
+| Method | Route     | Body                 | Returns                                             |
+|--------|-----------|----------------------|-----------------------------------------------------|
+| POST   | `/search` | `{"query": str, "k": int}` | `question_id`, `question`, `retrieved_sources`, `warning` |
+| POST   | `/answer` | `{"query": str, "k": int}` | the same fields plus `answer`                        |
+
+`k` is optional (default 10). `warning` is `null` normally, or a sentence when
+the question has no searchable words or no chunk matches; in that case
+`/answer` skips the LLM and returns the warning as the answer.
+
+**Example**
+
+```bash
+curl -X POST http://127.0.0.1:8000/answer \
+     -H "Content-Type: application/json" \
+     -d '{"query": "What HTTP endpoint is used to dynamically load a LoRA adapter in vLLM?", "k": 3}'
+```
+
+```json
+{
+  "question_id": "3c398dc6-b9f7-42b2-9f90-76a557156512",
+  "question": "What HTTP endpoint is used to dynamically load a LoRA adapter in vLLM?",
+  "retrieved_sources": [
+    {"file_path": "data/raw/vllm-0.10.1/docs/features/lora.md",
+     "first_character_index": 4695, "last_character_index": 6098}
+  ],
+  "answer": "The HTTP endpoint used to dynamically load a LoRA adapter in vLLM is `/v1/load_lora_adapter`.",
+  "warning": null
+}
+```
+
+**Errors** never stop the server; each bad request gets its own reply:
+
+| Case                         | Status | Reply                                             |
+|------------------------------|--------|---------------------------------------------------|
+| empty query, `k` < 1         | 422    | validation details from the pydantic models       |
+| `k` larger than the index    | 400    | `k=... is larger than the ... chunks in the index` |
+| missing index at startup     | -      | the server does not start: `Index not found ... Run 'python -m src index'` |
+
 ## Resources
 
 - https://en.wikipedia.org/wiki/Retrieval-augmented_generation
@@ -209,6 +268,8 @@ uv run python -m src answer_dataset \
 - https://www.youtube.com/watch?v=sVcwVQRHIc8
 - https://www.youtube.com/watch?v=T-D1OfcDW1M
 - https://www.youtube.com/watch?v=_HQ2H_0Ayy0
+- https://fastapi.tiangolo.com/
+- https://www.uvicorn.dev/
 
 ### Use of Artificial Intelligence
 

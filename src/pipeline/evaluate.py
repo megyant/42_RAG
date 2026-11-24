@@ -1,4 +1,4 @@
-from ..helpers.models import MinimalSource, RagDataset
+from ..helpers.models import MinimalSource, RagDataset, AnsweredQuestion
 import json
 from pydantic import ValidationError
 from ..helpers import ParseError
@@ -64,13 +64,13 @@ def load_ground_truth(dataset_path: str) -> RagDataset:
 
     Raises:
         ParseError: If the file cannot be read, contains invalid JSON, or
-        fails validation.
+        fails validation, or has no ground-truth sources.
     """
     try:
         with open(dataset_path, encoding="utf-8") as f:
             dataset = json.load(f)
 
-        return RagDataset.model_validate(dataset)
+        ground_truth = RagDataset.model_validate(dataset)
     except OSError:
         raise ParseError(f"File '{dataset_path}' "
                          "could not be loaded.")
@@ -79,4 +79,11 @@ def load_ground_truth(dataset_path: str) -> RagDataset:
                          "could not be processed.")
     except ValidationError:
         raise ParseError(f"File '{dataset_path}' "
-                         "is not a valid search results file.")
+                         "is not a valid RAG dataset.")
+
+    if not any(isinstance(q, AnsweredQuestion) and q.sources
+               for q in ground_truth.rag_questions):
+        raise ParseError(f"File '{dataset_path}' has no ground-truth "
+                         "sources. Use a file from AnsweredQuestions/")
+
+    return ground_truth

@@ -60,3 +60,15 @@ class EvaluateArgs(CliArgs):
     """
     student_search_results_path: str
     dataset_path: str
+
+
+class ServerArgs(CliArgs):
+    """
+    Arguments for running a HTTP API server
+
+    A port is a 16-bit number so 65535 is the largest one that exists.
+    Ports below 1024 are reserved on Linux
+    strict=True prevent roundings
+    """
+    host: str = Field("127.0.1", min_length=1)
+    port: int = Field(8000, ge=1024, le=65535, strict=True)
