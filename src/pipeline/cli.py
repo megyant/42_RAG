@@ -275,33 +275,6 @@ class Cli:
             args = EvaluateArgs(
                 student_search_results_path=student_search_results_path,
                 dataset_path=dataset_path)
-            results = load_student_search_results(
-                args.student_search_results_path)
-            ground_truth = load_ground_truth(args.dataset_path)
-
-            retrieved = {r.question_id: r.retrieved_sources
-                         for r in results.search_results}
-            known_ids = {q.question_id for q in ground_truth.rag_questions}
-            unknown = {qid for qid in retrieved if qid not in known_ids}
-            if unknown:
-                print(f"{Colors.BOLD}{Colors.YELLOW}Warning:{Colors.END} "
-                      f"{len(unknown)} question_id(s) are not in the dataset")
-
-            missing = len(known_ids - retrieved.keys())
-            print(f"{Colors.BOLD}{Colors.YELLOW}Warning:{Colors.END} "
-                  f"{missing} question(s) have no search results")
-
-            total = 0.0
-            for q in ground_truth.rag_questions:
-                truth = q.sources if isinstance(q, AnsweredQuestion) else []
-                total += question_recall(truth,
-                                         retrieved.get(q.question_id, []),
-                                         results.k)
-            questions = len(ground_truth.rag_questions)
-            recall = total / questions if questions else 0.0
-
-            print(f"{Colors.BOLD}{Colors.BLUE}Recall@{results.k}:"
-                  f"{Colors.END} {recall:.3f}")
         except ValidationError as e:
             msgs = [f"'{err['loc'][0]}' - {err['msg']}" for err in e.errors()]
             raise ParseError("\n".join(msgs)) from None
@@ -317,6 +290,7 @@ class Cli:
         if unknown:
             print(f"{Colors.BOLD}{Colors.YELLOW}Warning:{Colors.END} "
                   f"{len(unknown)} question_id(s) are not in the dataset")
+
         missing = len(known_ids - retrieved.keys())
         if missing:
             print(f"{Colors.BOLD}{Colors.YELLOW}Warning:{Colors.END} "
@@ -328,8 +302,8 @@ class Cli:
             total += question_recall(truth,
                                      retrieved.get(q.question_id, []),
                                      results.k)
-
         questions = len(ground_truth.rag_questions)
         recall = total / questions if questions else 0.0
-        print(f"{Colors.BOLD}{Colors.BLUE}Recall@{results.k}:{Colors.END} "
-              f"{recall:.3f}")
+
+        print(f"{Colors.BOLD}{Colors.BLUE}Recall@{results.k}:"
+              f"{Colors.END} {recall:.3f}")
