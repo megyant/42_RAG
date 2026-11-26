@@ -15,6 +15,7 @@ from .evaluate import load_ground_truth, question_recall
 from tqdm import tqdm
 from pydantic import ValidationError
 from pathlib import Path
+import sys
 
 
 class Cli:
@@ -38,7 +39,12 @@ class Cli:
             msgs = [f"'{err['loc'][0]}' - {err['msg']}" for err in e.errors()]
             raise ParseError("\n".join(msgs)) from None
 
-        all_paths = collect_files()
+        try:
+            all_paths = collect_files()
+        except ParseError as e:
+            print(e, file=sys.stderr)
+            return
+
         chunk = Chunk(args.max_chunk_size)
         chunks: list[DataSource] = []
 

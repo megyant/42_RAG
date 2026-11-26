@@ -18,13 +18,17 @@ def collect_files(raw_path: str = Paths.RAW_PATH) -> list[Path]:
         list[Path]: A sorted list of file paths matching the criteria.
     """
     root = Path(raw_path)
+    if not root.is_dir():
+        raise ParseError("vLLM repository not found.")
     suffixes = [".py", ".md", ".txt"]
 
     files: list[Path] = []
-
     for p in root.rglob("*"):
         if p.is_file() and p.suffix in suffixes:
             files.append(p)
+
+    if not files:
+        raise ParseError("No .py/.md/.txt files found in vLLM repository")
 
     return sorted(files)
 
